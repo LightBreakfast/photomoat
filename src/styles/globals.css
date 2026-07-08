@@ -1,0 +1,181 @@
+@import 'tailwindcss';
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-surface: var(--surface);
+  --color-surface-foreground: var(--surface-foreground);
+  --color-surface-muted: var(--surface-muted);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-danger: var(--danger);
+  --color-danger-foreground: var(--danger-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-destructive: var(--destructive);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --font-sans: Inter, system-ui, sans-serif;
+  --panel-left: 240px;
+  --panel-right: 280px;
+  --top-bar: 48px;
+  --status-bar: 32px;
+}
+
+:root {
+  --background: hsl(0 0% 98%);
+  --foreground: hsl(220 14% 14%);
+  --surface: hsl(0 0% 100%);
+  --surface-foreground: hsl(220 14% 14%);
+  --surface-muted: hsl(220 14% 96%);
+  --border: hsl(220 12% 65%);
+  --muted: hsl(220 10% 40%);
+  --muted-foreground: hsl(220 10% 40%);
+  --accent: hsl(220 14% 42%);
+  --accent-foreground: hsl(0 0% 100%);
+  --danger: hsl(0 60% 45%);
+  --danger-foreground: hsl(0 0% 100%);
+  --card: hsl(0 0% 100%);
+  --card-foreground: hsl(220 14% 14%);
+  --popover: hsl(0 0% 100%);
+  --popover-foreground: hsl(220 14% 14%);
+  --primary: hsl(220 14% 42%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(220 14% 96%);
+  --secondary-foreground: hsl(220 14% 14%);
+  --destructive: hsl(0 60% 45%);
+  --input: hsl(220 12% 65%);
+  --ring: hsl(220 14% 42%);
+  --radius: 0.375rem;
+}
+
+.dark {
+  --background: hsl(220 14% 6%);
+  --foreground: hsl(220 12% 88%);
+  --surface: hsl(220 14% 9%);
+  --surface-foreground: hsl(220 12% 88%);
+  --surface-muted: hsl(220 12% 12%);
+  --border: hsl(220 10% 35%);
+  --muted: hsl(220 10% 62%);
+  --muted-foreground: hsl(220 10% 62%);
+  --accent: hsl(220 14% 68%);
+  --accent-foreground: hsl(220 14% 14%);
+  --danger: hsl(0 60% 62%);
+  --danger-foreground: hsl(0 0% 100%);
+  --card: hsl(220 14% 9%);
+  --card-foreground: hsl(220 12% 88%);
+  --popover: hsl(220 14% 9%);
+  --popover-foreground: hsl(220 12% 88%);
+  --primary: hsl(220 14% 68%);
+  --primary-foreground: hsl(220 14% 14%);
+  --secondary: hsl(220 12% 12%);
+  --secondary-foreground: hsl(220 12% 88%);
+  --destructive: hsl(0 60% 62%);
+  --input: hsl(220 10% 35%);
+  --ring: hsl(220 14% 68%);
+}
+
+/* Mobile sidebar overlay */
+.sidebar-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background-color: hsl(220 14% 6% / 0.5);
+}
+
+.sidebar-panel {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  z-index: 40;
+  width: 280px;
+  max-width: 80vw;
+  overflow-y: auto;
+}
+
+.sidebar-left {
+  left: 0;
+  border-right: 1px solid var(--border);
+  background-color: var(--surface);
+}
+
+.sidebar-right {
+  right: 0;
+  border-left: 1px solid var(--border);
+  background-color: var(--surface);
+}
+
+@media (min-width: 768px) {
+  .sidebar-overlay {
+    display: none;
+  }
+  .sidebar-panel {
+    display: none;
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    overflow: clip;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: Inter, system-ui, sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  *:focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 1px;
+  }
+
+  button,
+  input,
+  select {
+    font: inherit;
+  }
+
+  button {
+    cursor: pointer;
+  }
+
+  img,
+  canvas {
+    display: block;
+    max-width: 100%;
+  }
+}
