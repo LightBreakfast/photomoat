@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { FilterAdjustments, ImageSizingMode } from '@/features/borders/types'
 import type { OutputPreset } from '@/shared/types'
@@ -15,10 +15,22 @@ type PreviewCanvasProps = {
   filterAdjustments?: FilterAdjustments
   label: string
   fullSize?: boolean
+  zoomPercent?: number
 }
 
 function scalePreviewPixels(pixels: number, previewScale: number) {
   return Math.max(1, Math.round(pixels * previewScale))
+}
+
+function getFullSizePreviewDimensions(width: number, height: number) {
+  const maxLongEdge = 2400
+  const scale = Math.min(maxLongEdge / width, maxLongEdge / height, 1)
+
+  return {
+    scale,
+    width: Math.round(width * scale),
+    height: Math.round(height * scale),
+  }
 }
 
 export function PreviewCanvas({
@@ -31,9 +43,15 @@ export function PreviewCanvas({
   filterAdjustments,
   label,
   fullSize = false,
+  zoomPercent,
 }: PreviewCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [hasError, setHasError] = useState(false)
+  const fullSizeDimensions = useMemo(
+    () =>
+      fullSize ? getFullSizePreviewDimensions(preset.width, preset.height) : null,
+    [fullSize, preset.height, preset.width],
+  )
 
   useEffect(() => {
     let isMounted = true
@@ -56,11 +74,10 @@ export function PreviewCanvas({
         let renderHeight: number
         let scale: number
 
-        if (fullSize) {
-          const maxDim = 1200
-          scale = Math.min(maxDim / preset.width, maxDim / preset.height, 1)
-          renderWidth = Math.round(preset.width * scale)
-          renderHeight = Math.round(preset.height * scale)
+        if (fullSize && fullSizeDimensions) {
+          scale = fullSizeDimensions.scale
+          renderWidth = fullSizeDimensions.width
+          renderHeight = fullSizeDimensions.height
         } else {
           const previewSize = getPreviewCanvasSize(preset.width, preset.height)
           scale = Math.min(
@@ -104,7 +121,18 @@ export function PreviewCanvas({
     return () => {
       isMounted = false
     }
-  }, [backgroundColor, borderWidthPixels, edgePixels, filterAdjustments, fullSize, preset.height, preset.width, sizingMode, sourceUrl])
+  }, [
+    backgroundColor,
+    borderWidthPixels,
+    edgePixels,
+    filterAdjustments,
+    fullSize,
+    fullSizeDimensions,
+    preset.height,
+    preset.width,
+    sizingMode,
+    sourceUrl,
+  ])
 
   if (hasError) {
     return (
@@ -118,7 +146,21 @@ export function PreviewCanvas({
     <canvas
       ref={canvasRef}
       aria-label={label}
-      className={fullSize ? 'max-h-full max-w-full object-contain' : 'w-full bg-surface-muted'}
+      className={
+        fullSize
+          ? typeof zoomPercent === 'number'
+            ? 'block shrink-0 bg-surface-muted'
+            : 'max-h-full max-w-full bg-surface-muted object-contain'
+          : 'w-full bg-surface-muted'
+      }
+      style={
+        fullSize && typeof zoomPercent === 'number' && fullSizeDimensions
+          ? {
+              width: `${Math.round((fullSizeDimensions.width * zoomPercent) / 100)}px`,
+              height: 'auto',
+            }
+          : undefined
+      }
     />
   )
 }

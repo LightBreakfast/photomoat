@@ -59,6 +59,23 @@ describe('ImageGrid', () => {
     expect(screen.getByText('This image could not be loaded.')).toBeInTheDocument()
   })
 
+  it('aligns cards to the start so borders do not stretch to the tallest row', () => {
+    const { container } = render(
+      <ImageGrid
+        items={[item]}
+        preset={preset}
+        backgroundColor="#ffffff"
+        sizingMode="contain"
+        edgePixels={900}
+        borderWidthPixels={90}
+        onRemove={vi.fn()}
+        onDownload={vi.fn()}
+      />,
+    )
+
+    expect(container.firstChild).toHaveClass('items-start')
+  })
+
   it('renders icon buttons with aria-labels', () => {
     render(
       <ImageGrid
@@ -76,14 +93,14 @@ describe('ImageGrid', () => {
         borderWidthPixels={90}
         onRemove={vi.fn()}
         onDownload={vi.fn()}
-        onPreview={vi.fn()}
+        onInspect={vi.fn()}
         onToggleSelect={vi.fn()}
       />,
     )
 
     expect(screen.getByRole('button', { name: /remove portrait/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /download portrait/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /expand preview/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /inspect portrait/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /select portrait/i })).toBeInTheDocument()
   })
 

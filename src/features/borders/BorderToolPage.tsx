@@ -1,24 +1,41 @@
-import { useMemo, useState } from 'react'
-import { CheckSquare, Grid3X3, Pencil, Settings, Square } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import {
+  CheckSquare,
+  ChevronLeft,
+  ChevronRight,
+  Contrast,
+  Grid3X3,
+  Pencil,
+  Settings,
+  Square,
+} from 'lucide-react'
 
 import { BorderControls } from '@/features/borders/components/BorderControls'
+import { BrowseWorkspace } from '@/features/borders/components/BrowseWorkspace'
 import { FilterControls } from '@/features/borders/components/FilterControls'
+import { InspectWorkspace } from '@/features/borders/components/InspectWorkspace'
 import { PresetSelector } from '@/features/borders/components/PresetSelector'
+import { WorkspaceFooterIconButton } from '@/features/borders/components/WorkspaceFooterIconButton'
+import { WorkspaceModeToggle } from '@/features/borders/components/WorkspaceModeToggle'
 import { resolveFilterAdjustments } from '@/features/borders/filterPresets'
 import { getPresetById, instagramPresets } from '@/features/borders/presets'
 import { renderProcessedCanvas } from '@/features/borders/processing/canvasProcessor'
+import type { InspectZoom } from '@/features/borders/types'
 import { useBorderSettings } from '@/features/borders/useBorderSettings'
 import { Dropzone } from '@/shared/components/Dropzone'
 import { ExportControls } from '@/shared/components/ExportControls'
-import { ImageGrid } from '@/shared/components/ImageGrid'
-import { ImageViewer } from '@/shared/components/ImageViewer'
-import { PreviewCanvas } from '@/shared/components/PreviewCanvas'
-import { Tooltip } from '@/shared/components/Tooltip'
 import { useImageQueue } from '@/shared/hooks/useImageQueue'
 import type { ImageQueueItem } from '@/shared/types'
 import { canvasToBlob, downloadBlob } from '@/shared/utils/downloadBlob'
 import { exportZip } from '@/shared/utils/exportZip'
 import { createBorderedFilename } from '@/shared/utils/filename'
+
+const inspectZoomOptions: { label: string; value: InspectZoom }[] = [
+  { label: 'Fit', value: { mode: 'fit' } },
+  { label: '50%', value: { mode: 'percent', percent: 50 } },
+  { label: '100%', value: { mode: 'percent', percent: 100 } },
+  { label: '200%', value: { mode: 'percent', percent: 200 } },
+]
 
 export function BorderToolPage() {
   const {
@@ -36,14 +53,27 @@ export function BorderToolPage() {
   } = useBorderSettings()
   const { items, message, addFiles, removeItem, setItemStatus } =
     useImageQueue()
-  const [activeDownloadId, setActiveDownloadId] = useState<string | null>(null)
-  const [progressMessage, setProgressMessage] = useState<string | null>(null)
-  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
-  const [viewerIndex, setViewerIndex] = useState<number | null>(null)
+
+  const [workspaceMode, setWorkspaceMode] = useState<'browse' | 'inspect'>('browse')
+  const [activeItemId, setActiveItemId] = useState<string | null>(null)
+  const [inspectZoom, setInspectZoom] = useState<InspectZoom>({ mode: 'fit' })
   const [mobilePanel, setMobilePanel] = useState<'none' | 'left' | 'right'>('none')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [columns, setColumns] = useState(3)
+  const [activeDownloadId, setActiveDownloadId] = useState<string | null>(null)
+  const [progressMessage, setProgressMessage] = useState<string | null>(null)
+  const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
   const [isCompareActive, setIsCompareActive] = useState(false)
+
+  const readyItems = useMemo(
+    () => items.filter((item) => item.status === 'ready'),
+    [items],
+  )
+
+  const hasSelection = selectedIds.size > 0
+  const exportItems = hasSelection
+    ? readyItems.filter((item) => selectedIds.has(item.id))
+    : readyItems
 
   const activeFilterAdjustments = useMemo(
     () => resolveFilterAdjustments(isCompareActive ? 'original' : settings.filterPresetId),
@@ -60,17 +90,39 @@ export function BorderToolPage() {
     [settings.presetId, settings.customWidth, settings.customHeight],
   )
 
-  const readyItems = useMemo(
-    () => items.filter((item) => item.status === 'ready'),
-    [items],
+  const activeInspectIndex = useMemo(
+    () => items.findIndex((item) => item.id === activeItemId),
+    [activeItemId, items],
   )
 
-  const hasSelection = selectedIds.size > 0
-  const exportItems = hasSelection
-    ? readyItems.filter((item) => selectedIds.has(item.id))
-    : readyItems
+  const activeInspectItem = activeInspectIndex >= 0 ? items[activeInspectIndex] : null
+  const canInspectPrevious = activeInspectIndex > 0
+  const canInspectNext =
+    activeInspectIndex >= 0 && activeInspectIndex < items.length - 1
 
-  const handleToggleSelect = (id: string, event: { metaKey: boolean; ctrlKey: boolean }) => {
+  useEffect(() => {
+    if (items.length === 0) {
+      setWorkspaceMode('browse')
+      setActiveItemId(null)
+      setIsCompareActive(false)
+      return
+    }
+
+    if (workspaceMode !== 'inspect') {
+      return
+    }
+
+    if (activeItemId && items.some((item) => item.id === activeItemId)) {
+      return
+    }
+
+    setActiveItemId(items[0].id)
+  }, [activeItemId, items, workspaceMode])
+
+  const handleToggleSelect = (
+    id: string,
+    event: { metaKey: boolean; ctrlKey: boolean },
+  ) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
       const modifier = event.metaKey || event.ctrlKey
@@ -81,13 +133,11 @@ export function BorderToolPage() {
         } else {
           next.add(id)
         }
+      } else if (next.has(id) && next.size === 1) {
+        next.clear()
       } else {
-        if (next.has(id) && next.size === 1) {
-          next.clear()
-        } else {
-          next.clear()
-          next.add(id)
-        }
+        next.clear()
+        next.add(id)
       }
 
       return next
@@ -105,7 +155,10 @@ export function BorderToolPage() {
   const handleRemoveItem = (id: string) => {
     removeItem(id)
     setSelectedIds((prev) => {
-      if (!prev.has(id)) return prev
+      if (!prev.has(id)) {
+        return prev
+      }
+
       const next = new Set(prev)
       next.delete(id)
       return next
@@ -152,7 +205,9 @@ export function BorderToolPage() {
     }
 
     setProgress({ current: 0, total: exportItems.length })
-    setProgressMessage(`Preparing ${exportItems.length} image${exportItems.length > 1 ? 's' : ''}…`)
+    setProgressMessage(
+      `Preparing ${exportItems.length} image${exportItems.length > 1 ? 's' : ''}…`,
+    )
 
     try {
       await exportZip({
@@ -195,6 +250,63 @@ export function BorderToolPage() {
     setIsCompareActive(false)
   }
 
+  const handleWorkspaceModeChange = (mode: 'browse' | 'inspect') => {
+    if (mode === 'inspect') {
+      const nextActiveId =
+        activeItemId && items.some((item) => item.id === activeItemId)
+          ? activeItemId
+          : items[0]?.id ?? null
+
+      setActiveItemId(nextActiveId)
+      setInspectZoom({ mode: 'fit' })
+    } else {
+      handleCompareEnd()
+    }
+
+    setWorkspaceMode(mode)
+  }
+
+  const handleInspect = (index: number) => {
+    const item = items[index]
+
+    if (!item) {
+      return
+    }
+
+    setActiveItemId(item.id)
+    setInspectZoom({ mode: 'fit' })
+    setWorkspaceMode('inspect')
+    handleCompareEnd()
+  }
+
+  const handleInspectPrevious = () => {
+    if (!canInspectPrevious) {
+      return
+    }
+
+    setActiveItemId(items[activeInspectIndex - 1].id)
+    handleCompareEnd()
+  }
+
+  const handleInspectNext = () => {
+    if (!canInspectNext) {
+      return
+    }
+
+    setActiveItemId(items[activeInspectIndex + 1].id)
+    handleCompareEnd()
+  }
+
+  const footerStatus =
+    message ??
+    (workspaceMode === 'inspect' && activeInspectItem
+      ? activeInspectItem.filename
+      : hasSelection
+        ? `${selectedIds.size} of ${items.length} selected`
+        : items.length > 0
+          ? `${items.length} image${items.length > 1 ? 's' : ''}`
+          : 'Ready')
+
   const leftPanelContent = (
     <div className="space-y-5">
       <div className="space-y-2">
@@ -211,10 +323,7 @@ export function BorderToolPage() {
       </div>
       <FilterControls
         selectedPresetId={settings.filterPresetId}
-        isCompareActive={isCompareActive}
         onPresetChange={setFilterPresetId}
-        onCompareStart={handleCompareStart}
-        onCompareEnd={handleCompareEnd}
       />
     </div>
   )
@@ -271,14 +380,11 @@ export function BorderToolPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1">
-        {/* Desktop left panel */}
         <aside className="hidden w-60 shrink-0 overflow-y-auto border-r border-border bg-surface p-3 md:block">
           {leftPanelContent}
         </aside>
 
-        {/* Centre panel */}
-        <main className="flex min-w-0 flex-1 flex-col overflow-y-auto bg-background p-4">
-          {/* Mobile toolbar */}
+        <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background p-4">
           <div className="mb-3 flex items-center gap-2 md:hidden">
             <button
               type="button"
@@ -311,47 +417,44 @@ export function BorderToolPage() {
                 }}
               />
             </div>
-          ) : items.length === 1 ? (
-            <div className="flex flex-1 items-center justify-center p-4">
-              <PreviewCanvas
-                sourceUrl={items[0].objectUrl}
+          ) : workspaceMode === 'browse' ? (
+            <div className="flex flex-1 min-h-0 overflow-y-auto">
+              <BrowseWorkspace
+                items={items}
                 preset={selectedPreset}
                 backgroundColor={settings.backgroundColor}
                 sizingMode={settings.imageSizingMode}
                 edgePixels={settings.imageEdgePixels}
                 borderWidthPixels={settings.borderWidthPixels}
                 filterAdjustments={activeFilterAdjustments}
-                label={`Preview for ${items[0].filename}`}
-                fullSize
+                columns={columns}
+                activeDownloadId={activeDownloadId}
+                selectedIds={selectedIds}
+                onRemove={handleRemoveItem}
+                onDownload={handleSingleDownload}
+                onInspect={handleInspect}
+                onToggleSelect={handleToggleSelect}
               />
             </div>
           ) : (
-            <ImageGrid
-              items={items}
+            <InspectWorkspace
+              item={activeInspectItem}
               preset={selectedPreset}
               backgroundColor={settings.backgroundColor}
               sizingMode={settings.imageSizingMode}
               edgePixels={settings.imageEdgePixels}
               borderWidthPixels={settings.borderWidthPixels}
-              filterAdjustments={exportFilterAdjustments}
-              columns={columns}
-              activeDownloadId={activeDownloadId}
-              selectedIds={selectedIds}
-              onRemove={handleRemoveItem}
-              onDownload={handleSingleDownload}
-              onPreview={setViewerIndex}
-              onToggleSelect={handleToggleSelect}
+              filterAdjustments={activeFilterAdjustments}
+              inspectZoom={inspectZoom}
             />
           )}
         </main>
 
-        {/* Desktop right panel */}
         <aside className="hidden w-70 shrink-0 overflow-y-auto border-l border-border bg-surface p-3 md:block">
           {rightPanelContent}
         </aside>
       </div>
 
-      {/* Mobile sidebar overlays */}
       {mobilePanel !== 'none' ? (
         <>
           <div
@@ -372,39 +475,38 @@ export function BorderToolPage() {
         </>
       ) : null}
 
-      {/* Status bar */}
-      <footer className="flex h-8 shrink-0 items-center border-t border-border bg-surface px-4">
-        <p className="w-48 text-xs text-muted">
-          {message ?? (hasSelection
-            ? `${selectedIds.size} of ${items.length} selected`
-            : items.length > 0 ? `${items.length} image${items.length > 1 ? 's' : ''}` : 'Ready')}
-        </p>
-        <div className="flex flex-1 items-center justify-center gap-2">
-          {items.length > 1 ? (
+      <footer
+        aria-label="Workspace footer"
+        className="grid h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-t border-border bg-surface px-4"
+      >
+        <p className="min-w-0 truncate pr-2 text-xs text-muted">{footerStatus}</p>
+
+        <div className="flex min-w-0 items-center justify-center gap-2">
+          {workspaceMode === 'browse' && items.length > 0 ? (
             <>
-              <Tooltip label="Select all">
-                <button
-                  type="button"
-                  onClick={handleSelectAll}
-                  className="flex h-6 w-6 items-center justify-center text-muted hover:text-foreground"
-                  aria-label="Select all"
-                >
-                  <CheckSquare size={14} />
-                </button>
-              </Tooltip>
-              <Tooltip label="Deselect">
-                <button
-                  type="button"
-                  onClick={handleClearSelection}
-                  disabled={!hasSelection}
-                  className="flex h-6 w-6 items-center justify-center text-muted disabled:cursor-not-allowed disabled:opacity-40 hover:text-foreground"
-                  aria-label="Deselect all"
-                >
-                  <Square size={14} />
-                </button>
-              </Tooltip>
+              <WorkspaceFooterIconButton
+                label="Original"
+                icon={Contrast}
+                pressed={isCompareActive}
+                onPointerDown={handleCompareStart}
+                onPointerUp={handleCompareEnd}
+                onPointerLeave={handleCompareEnd}
+                onPointerCancel={handleCompareEnd}
+              />
               <div className="mx-1 h-3 w-px bg-border" />
-              <label className="flex items-center gap-1.5">
+              <WorkspaceFooterIconButton
+                label="Select all"
+                icon={CheckSquare}
+                onClick={handleSelectAll}
+              />
+              <WorkspaceFooterIconButton
+                label="Deselect all"
+                icon={Square}
+                disabled={!hasSelection}
+                onClick={handleClearSelection}
+              />
+              <div className="mx-1 h-3 w-px bg-border" />
+              <label className="flex h-8 items-center gap-1.5 rounded-md px-1">
                 <Grid3X3 size={12} className="text-muted" />
                 <input
                   type="range"
@@ -418,30 +520,64 @@ export function BorderToolPage() {
               </label>
             </>
           ) : null}
-        </div>
-        <div className="w-48" />
-      </footer>
 
-      {viewerIndex !== null ? (
-        <ImageViewer
-          items={items}
-          currentIndex={viewerIndex}
-          preset={selectedPreset}
-          backgroundColor={settings.backgroundColor}
-          sizingMode={settings.imageSizingMode}
-          edgePixels={settings.imageEdgePixels}
-          borderWidthPixels={settings.borderWidthPixels}
-          filterAdjustments={activeFilterAdjustments}
-          isCompareActive={isCompareActive}
-          onCompareStart={handleCompareStart}
-          onCompareEnd={handleCompareEnd}
-          onClose={() => {
-            handleCompareEnd()
-            setViewerIndex(null)
-          }}
-          onNavigate={setViewerIndex}
-        />
-      ) : null}
+          {workspaceMode === 'inspect' && activeInspectItem ? (
+            <>
+              <WorkspaceFooterIconButton
+                label="Previous image"
+                icon={ChevronLeft}
+                disabled={!canInspectPrevious}
+                onClick={handleInspectPrevious}
+              />
+              <span className="min-w-[3rem] text-center text-xs tabular-nums text-muted">
+                {activeInspectIndex + 1} / {items.length}
+              </span>
+              <WorkspaceFooterIconButton
+                label="Next image"
+                icon={ChevronRight}
+                disabled={!canInspectNext}
+                onClick={handleInspectNext}
+              />
+              <div className="mx-1 h-3 w-px bg-border" />
+              <WorkspaceFooterIconButton
+                label="Original"
+                icon={Contrast}
+                pressed={isCompareActive}
+                onPointerDown={handleCompareStart}
+                onPointerUp={handleCompareEnd}
+                onPointerLeave={handleCompareEnd}
+                onPointerCancel={handleCompareEnd}
+              />
+              <div className="mx-1 h-3 w-px bg-border" />
+              <select
+                value={JSON.stringify(inspectZoom)}
+                onChange={(event) => {
+                  setInspectZoom(JSON.parse(event.target.value) as InspectZoom)
+                  handleCompareEnd()
+                }}
+                className="h-8 rounded-md border border-border bg-surface px-2.5 text-xs text-foreground"
+                aria-label="Inspect zoom level"
+              >
+                {inspectZoomOptions.map((option) => (
+                  <option key={option.label} value={JSON.stringify(option.value)}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </>
+          ) : null}
+        </div>
+
+        <div className="flex shrink-0 items-center justify-end">
+          {items.length > 0 ? (
+            <WorkspaceModeToggle
+              mode={workspaceMode}
+              onChange={handleWorkspaceModeChange}
+              size="compact"
+            />
+          ) : null}
+        </div>
+      </footer>
     </div>
   )
 }

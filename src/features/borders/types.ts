@@ -15,6 +15,12 @@ export type FilterAdjustments = {
   hueRotate: number
 }
 
+export const inspectZoomPercents = [50, 100, 200] as const
+
+export type InspectZoom =
+  | { mode: 'fit' }
+  | { mode: 'percent'; percent: (typeof inspectZoomPercents)[number] }
+
 export type BorderSettings = {
   presetId: OutputPresetId
   backgroundColor: string
