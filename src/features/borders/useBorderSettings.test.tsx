@@ -24,6 +24,8 @@ describe('useBorderSettings', () => {
       result.current.setImageSizingMode('border-width')
       result.current.setImageEdgePixels(840)
       result.current.setBorderWidthPixels(72)
+      result.current.setCustomWidth(1920)
+      result.current.setCustomHeight(1080)
     })
 
     expect(JSON.parse(window.localStorage.getItem(borderSettingsStorageKey) ?? '{}')).toEqual({
@@ -34,6 +36,46 @@ describe('useBorderSettings', () => {
       imageSizingMode: 'border-width',
       imageEdgePixels: 840,
       borderWidthPixels: 72,
+      customWidth: 1920,
+      customHeight: 1080,
     })
+  })
+
+  it('accepts fill sizing mode', () => {
+    window.localStorage.removeItem(borderSettingsStorageKey)
+
+    const { result } = renderHook(() => useBorderSettings())
+
+    act(() => {
+      result.current.setImageSizingMode('fill')
+    })
+
+    expect(result.current.settings.imageSizingMode).toBe('fill')
+  })
+
+  it('accepts custom preset id', () => {
+    window.localStorage.removeItem(borderSettingsStorageKey)
+
+    const { result } = renderHook(() => useBorderSettings())
+
+    act(() => {
+      result.current.setPresetId('custom')
+    })
+
+    expect(result.current.settings.presetId).toBe('custom')
+  })
+
+  it('clamps custom dimensions to valid range', () => {
+    window.localStorage.removeItem(borderSettingsStorageKey)
+
+    const { result } = renderHook(() => useBorderSettings())
+
+    act(() => {
+      result.current.setCustomWidth(50)
+      result.current.setCustomHeight(20000)
+    })
+
+    expect(result.current.settings.customWidth).toBe(100)
+    expect(result.current.settings.customHeight).toBe(10000)
   })
 })

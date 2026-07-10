@@ -28,6 +28,8 @@ export function BorderToolPage() {
     setImageSizingMode,
     setImageEdgePixels,
     setBorderWidthPixels,
+    setCustomWidth,
+    setCustomHeight,
   } = useBorderSettings()
   const { items, message, addFiles, removeItem, setItemStatus } =
     useImageQueue()
@@ -40,8 +42,8 @@ export function BorderToolPage() {
   const [columns, setColumns] = useState(3)
 
   const selectedPreset = useMemo(
-    () => getPresetById(settings.presetId),
-    [settings.presetId],
+    () => getPresetById(settings.presetId, settings.customWidth, settings.customHeight),
+    [settings.presetId, settings.customWidth, settings.customHeight],
   )
 
   const readyItems = useMemo(
@@ -180,9 +182,13 @@ export function BorderToolPage() {
         }}
       />
       <PresetSelector
-        presets={instagramPresets}
+        instagramPresets={instagramPresets}
         selectedPresetId={settings.presetId}
         onChange={setPresetId}
+        customWidth={settings.customWidth}
+        customHeight={settings.customHeight}
+        onCustomWidthChange={setCustomWidth}
+        onCustomHeightChange={setCustomHeight}
       />
     </div>
   )

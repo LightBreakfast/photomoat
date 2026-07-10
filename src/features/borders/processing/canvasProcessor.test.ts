@@ -157,3 +157,59 @@ describe('calculateContainRect', () => {
     expect(getPreviewCanvasSize(1080, 1920)).toEqual({ width: 405, height: 720 })
   })
 })
+
+describe('calculateImagePlacementRect fill mode', () => {
+  it('covers a portrait image in a square canvas (crops top/bottom)', () => {
+    expect(
+      calculateImagePlacementRect({
+        sourceWidth: 800,
+        sourceHeight: 1200,
+        targetWidth: 1080,
+        targetHeight: 1080,
+        sizingMode: 'fill',
+      }),
+    ).toEqual({
+      scale: 1.35,
+      drawWidth: 1080,
+      drawHeight: 1620,
+      x: 0,
+      y: -270,
+    })
+  })
+
+  it('covers a landscape image in a square canvas (crops left/right)', () => {
+    expect(
+      calculateImagePlacementRect({
+        sourceWidth: 1600,
+        sourceHeight: 900,
+        targetWidth: 1080,
+        targetHeight: 1080,
+        sizingMode: 'fill',
+      }),
+    ).toEqual({
+      scale: 1.2,
+      drawWidth: 1920,
+      drawHeight: 1080,
+      x: -420,
+      y: 0,
+    })
+  })
+
+  it('covers a square image in a portrait canvas (crops top/bottom)', () => {
+    expect(
+      calculateImagePlacementRect({
+        sourceWidth: 1200,
+        sourceHeight: 1200,
+        targetWidth: 1080,
+        targetHeight: 1350,
+        sizingMode: 'fill',
+      }),
+    ).toEqual({
+      scale: 1.125,
+      drawWidth: 1350,
+      drawHeight: 1350,
+      x: -135,
+      y: 0,
+    })
+  })
+})
