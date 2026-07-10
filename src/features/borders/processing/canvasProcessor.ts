@@ -1,4 +1,5 @@
-import type { ImageSizingMode } from '@/features/borders/types'
+import { buildCanvasFilter, isNeutralFilter } from '@/features/borders/processing/filters'
+import type { FilterAdjustments, ImageSizingMode } from '@/features/borders/types'
 import { loadImageElement } from '@/shared/utils/imageLoader'
 
 export type ContainRectInput = {
@@ -36,6 +37,7 @@ type DrawImageOptions = {
   sizingMode?: ImageSizingMode
   edgePixels?: number
   borderWidthPixels?: number
+  filterAdjustments?: FilterAdjustments
 }
 
 type RenderCanvasOptions = {
@@ -46,6 +48,7 @@ type RenderCanvasOptions = {
   sizingMode?: ImageSizingMode
   edgePixels?: number
   borderWidthPixels?: number
+  filterAdjustments?: FilterAdjustments
 }
 
 const previewMaxEdge = 720
@@ -162,6 +165,7 @@ export function drawImageOnCanvas({
   sizingMode,
   edgePixels,
   borderWidthPixels,
+  filterAdjustments,
 }: DrawImageOptions) {
   const canvas = context.canvas
   canvas.width = targetWidth
@@ -183,7 +187,13 @@ export function drawImageOnCanvas({
     borderWidthPixels,
   })
 
+  if (filterAdjustments && !isNeutralFilter(filterAdjustments)) {
+    context.filter = buildCanvasFilter(filterAdjustments)
+  }
+
   context.drawImage(image, x, y, drawWidth, drawHeight)
+
+  context.filter = 'none'
 }
 
 export async function renderProcessedCanvas({
@@ -194,6 +204,7 @@ export async function renderProcessedCanvas({
   sizingMode,
   edgePixels,
   borderWidthPixels,
+  filterAdjustments,
 }: RenderCanvasOptions) {
   const image = await loadImageElement(sourceUrl)
   const canvas = document.createElement('canvas')
@@ -212,6 +223,7 @@ export async function renderProcessedCanvas({
     sizingMode,
     edgePixels,
     borderWidthPixels,
+    filterAdjustments,
   })
 
   return canvas

@@ -1,10 +1,13 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 
+import { resolveFilterAdjustments } from '@/features/borders/filterPresets'
 import {
   calculateContainRect,
   calculateImagePlacementRect,
+  drawImageOnCanvas,
   getPreviewCanvasSize,
 } from '@/features/borders/processing/canvasProcessor'
+import { buildCanvasFilter } from '@/features/borders/processing/filters'
 
 describe('calculateContainRect', () => {
   it('fits a portrait image inside a square canvas', () => {
@@ -211,5 +214,81 @@ describe('calculateImagePlacementRect fill mode', () => {
       x: -135,
       y: 0,
     })
+  })
+})
+
+describe('drawImageOnCanvas filters', () => {
+  it('applies the canvas filter only while drawing the image', () => {
+    const calls: string[] = []
+    const filterAdjustments = resolveFilterAdjustments('ember')
+    const expectedFilter = buildCanvasFilter(filterAdjustments)
+
+    const context = {
+      canvas: { width: 0, height: 0 },
+      fillStyle: '',
+      filter: 'none',
+      fillRect: vi.fn(() => {
+        calls.push(`fill:${context.filter}`)
+      }),
+      drawImage: vi.fn(() => {
+        calls.push(`draw:${context.filter}`)
+      }),
+    } as unknown as CanvasRenderingContext2D
+
+    const image = { width: 1200, height: 1200 } as CanvasImageSource & {
+      width: number
+      height: number
+    }
+
+    drawImageOnCanvas({
+      context,
+      image,
+      targetWidth: 1080,
+      targetHeight: 1080,
+      backgroundColor: '#ffffff',
+      filterAdjustments,
+    })
+
+    expect(calls).toEqual([
+      'fill:none',
+      `draw:${expectedFilter}`,
+    ])
+    expect(context.filter).toBe('none')
+  })
+
+  it('keeps neutral filters from affecting the render context', () => {
+    const calls: string[] = []
+
+    const context = {
+      canvas: { width: 0, height: 0 },
+      fillStyle: '',
+      filter: 'none',
+      fillRect: vi.fn(() => {
+        calls.push(`fill:${context.filter}`)
+      }),
+      drawImage: vi.fn(() => {
+        calls.push(`draw:${context.filter}`)
+      }),
+    } as unknown as CanvasRenderingContext2D
+
+    const image = { width: 1200, height: 1200 } as CanvasImageSource & {
+      width: number
+      height: number
+    }
+
+    drawImageOnCanvas({
+      context,
+      image,
+      targetWidth: 1080,
+      targetHeight: 1080,
+      backgroundColor: '#ffffff',
+      filterAdjustments: resolveFilterAdjustments('original'),
+    })
+
+    expect(calls).toEqual([
+      'fill:none',
+      'draw:none',
+    ])
+    expect(context.filter).toBe('none')
   })
 })
