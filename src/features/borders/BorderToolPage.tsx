@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react'
-import { CheckSquare, Grid3X3, Settings, Square } from 'lucide-react'
+import { CheckSquare, Grid3X3, Pencil, Settings, Square } from 'lucide-react'
 
 import { BorderControls } from '@/features/borders/components/BorderControls'
+import { FilterControls } from '@/features/borders/components/FilterControls'
 import { PresetSelector } from '@/features/borders/components/PresetSelector'
+import { resolveFilterAdjustments } from '@/features/borders/filterPresets'
 import { getPresetById, instagramPresets } from '@/features/borders/presets'
 import { renderProcessedCanvas } from '@/features/borders/processing/canvasProcessor'
 import { useBorderSettings } from '@/features/borders/useBorderSettings'
@@ -30,6 +32,7 @@ export function BorderToolPage() {
     setBorderWidthPixels,
     setCustomWidth,
     setCustomHeight,
+    setFilterPresetId,
   } = useBorderSettings()
   const { items, message, addFiles, removeItem, setItemStatus } =
     useImageQueue()
@@ -40,6 +43,17 @@ export function BorderToolPage() {
   const [mobilePanel, setMobilePanel] = useState<'none' | 'left' | 'right'>('none')
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [columns, setColumns] = useState(3)
+  const [isCompareActive, setIsCompareActive] = useState(false)
+
+  const activeFilterAdjustments = useMemo(
+    () => resolveFilterAdjustments(isCompareActive ? 'original' : settings.filterPresetId),
+    [isCompareActive, settings.filterPresetId],
+  )
+
+  const exportFilterAdjustments = useMemo(
+    () => resolveFilterAdjustments(settings.filterPresetId),
+    [settings.filterPresetId],
+  )
 
   const selectedPreset = useMemo(
     () => getPresetById(settings.presetId, settings.customWidth, settings.customHeight),
@@ -107,6 +121,7 @@ export function BorderToolPage() {
       sizingMode: settings.imageSizingMode,
       edgePixels: settings.imageEdgePixels,
       borderWidthPixels: settings.borderWidthPixels,
+      filterAdjustments: exportFilterAdjustments,
     })
 
     return canvasToBlob(canvas, settings.outputFormat, settings.jpegQuality)
@@ -172,15 +187,40 @@ export function BorderToolPage() {
     }
   }
 
+  const handleCompareStart = () => {
+    setIsCompareActive(true)
+  }
+
+  const handleCompareEnd = () => {
+    setIsCompareActive(false)
+  }
+
   const leftPanelContent = (
     <div className="space-y-5">
-      <Dropzone
-        variant="compact"
-        onFilesAccepted={async (files) => {
-          await addFiles(files)
-          setMobilePanel('none')
-        }}
+      <div className="space-y-2">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted">
+          Images
+        </p>
+        <Dropzone
+          variant="compact"
+          onFilesAccepted={async (files) => {
+            await addFiles(files)
+            setMobilePanel('none')
+          }}
+        />
+      </div>
+      <FilterControls
+        selectedPresetId={settings.filterPresetId}
+        isCompareActive={isCompareActive}
+        onPresetChange={setFilterPresetId}
+        onCompareStart={handleCompareStart}
+        onCompareEnd={handleCompareEnd}
       />
+    </div>
+  )
+
+  const rightPanelContent = (
+    <div className="space-y-5">
       <PresetSelector
         instagramPresets={instagramPresets}
         selectedPresetId={settings.presetId}
@@ -190,21 +230,22 @@ export function BorderToolPage() {
         onCustomWidthChange={setCustomWidth}
         onCustomHeightChange={setCustomHeight}
       />
-    </div>
-  )
 
-  const rightPanelContent = (
-    <div className="space-y-5">
-      <BorderControls
-        backgroundColor={settings.backgroundColor}
-        imageSizingMode={settings.imageSizingMode}
-        imageEdgePixels={settings.imageEdgePixels}
-        borderWidthPixels={settings.borderWidthPixels}
-        onBackgroundColorChange={setBackgroundColor}
-        onImageSizingModeChange={setImageSizingMode}
-        onImageEdgePixelsChange={setImageEdgePixels}
-        onBorderWidthPixelsChange={setBorderWidthPixels}
-      />
+      <div className="space-y-3 border-t border-border pt-3">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted">
+          Border
+        </p>
+        <BorderControls
+          backgroundColor={settings.backgroundColor}
+          imageSizingMode={settings.imageSizingMode}
+          imageEdgePixels={settings.imageEdgePixels}
+          borderWidthPixels={settings.borderWidthPixels}
+          onBackgroundColorChange={setBackgroundColor}
+          onImageSizingModeChange={setImageSizingMode}
+          onImageEdgePixelsChange={setImageEdgePixels}
+          onBorderWidthPixelsChange={setBorderWidthPixels}
+        />
+      </div>
 
       {items.length > 0 ? (
         <div className="space-y-3 border-t border-border pt-3">
@@ -243,20 +284,20 @@ export function BorderToolPage() {
               type="button"
               onClick={() => setMobilePanel('left')}
               className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-xs text-muted hover:text-foreground"
-              aria-label="Open presets"
+              aria-label="Open edit controls"
             >
-              <Grid3X3 size={16} />
-              Presets
+              <Pencil size={16} />
+              Edit
             </button>
             {items.length > 0 ? (
               <button
                 type="button"
                 onClick={() => setMobilePanel('right')}
                 className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-xs text-muted hover:text-foreground"
-                aria-label="Open controls"
+                aria-label="Open output controls"
               >
                 <Settings size={16} />
-                Controls
+                Output
               </button>
             ) : null}
           </div>
@@ -279,6 +320,7 @@ export function BorderToolPage() {
                 sizingMode={settings.imageSizingMode}
                 edgePixels={settings.imageEdgePixels}
                 borderWidthPixels={settings.borderWidthPixels}
+                filterAdjustments={activeFilterAdjustments}
                 label={`Preview for ${items[0].filename}`}
                 fullSize
               />
@@ -291,6 +333,7 @@ export function BorderToolPage() {
               sizingMode={settings.imageSizingMode}
               edgePixels={settings.imageEdgePixels}
               borderWidthPixels={settings.borderWidthPixels}
+              filterAdjustments={exportFilterAdjustments}
               columns={columns}
               activeDownloadId={activeDownloadId}
               selectedIds={selectedIds}
@@ -388,7 +431,14 @@ export function BorderToolPage() {
           sizingMode={settings.imageSizingMode}
           edgePixels={settings.imageEdgePixels}
           borderWidthPixels={settings.borderWidthPixels}
-          onClose={() => setViewerIndex(null)}
+          filterAdjustments={activeFilterAdjustments}
+          isCompareActive={isCompareActive}
+          onCompareStart={handleCompareStart}
+          onCompareEnd={handleCompareEnd}
+          onClose={() => {
+            handleCompareEnd()
+            setViewerIndex(null)
+          }}
           onNavigate={setViewerIndex}
         />
       ) : null}

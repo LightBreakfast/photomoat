@@ -1,4 +1,4 @@
-import type { ImageSizingMode } from '@/features/borders/types'
+import type { FilterAdjustments, ImageSizingMode } from '@/features/borders/types'
 import type { ImageQueueItem, OutputPreset } from '@/shared/types'
 import { ImageCard } from '@/shared/components/ImageCard'
 
@@ -9,6 +9,7 @@ type ImageGridProps = {
   sizingMode: ImageSizingMode
   edgePixels: number
   borderWidthPixels: number
+  filterAdjustments?: FilterAdjustments
   columns?: number
   activeDownloadId?: string | null
   selectedIds?: Set<string>
@@ -34,6 +35,7 @@ export function ImageGrid({
   sizingMode,
   edgePixels,
   borderWidthPixels,
+  filterAdjustments,
   columns = 3,
   activeDownloadId,
   selectedIds,
@@ -57,6 +59,7 @@ export function ImageGrid({
           sizingMode={sizingMode}
           edgePixels={edgePixels}
           borderWidthPixels={borderWidthPixels}
+          filterAdjustments={filterAdjustments}
           isDownloading={activeDownloadId === item.id}
           isSelected={selectedIds?.has(item.id)}
           onRemove={() => onRemove(item.id)}

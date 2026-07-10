@@ -16,6 +16,10 @@ dist-ssr
 external_assets/
 SCR-*.png
 
+# Local planning files
+PLAN.md
+PLANS/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

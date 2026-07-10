@@ -6,7 +6,8 @@ import {
   defaultCustomHeight,
   defaultCustomWidth,
 } from '@/features/borders/constants'
-import type { BorderSettings } from '@/features/borders/types'
+import { defaultFilterPresetId, isFilterPresetId } from '@/features/borders/filterPresets'
+import type { BorderSettings, FilterPresetId } from '@/features/borders/types'
 
 export const borderSettingsStorageKey = 'photomoat-border-settings'
 
@@ -20,6 +21,7 @@ const defaultSettings: BorderSettings = {
   borderWidthPixels: 90,
   customWidth: defaultCustomWidth,
   customHeight: defaultCustomHeight,
+  filterPresetId: defaultFilterPresetId,
 }
 
 function sanitizePositiveInteger(value: unknown, fallback: number) {
@@ -38,6 +40,10 @@ function sanitizePositiveIntegerInRange(
     return Math.min(max, Math.max(min, Math.round(value)))
   }
   return fallback
+}
+
+function sanitizeFilterPresetId(value: unknown): FilterPresetId {
+  return isFilterPresetId(value) ? value : defaultFilterPresetId
 }
 
 function sanitizeSettings(settings: Partial<BorderSettings>) {
@@ -71,6 +77,7 @@ function sanitizeSettings(settings: Partial<BorderSettings>) {
       customSizeMin,
       customSizeMax,
     ),
+    filterPresetId: sanitizeFilterPresetId(settings.filterPresetId),
   } satisfies BorderSettings
 }
 
@@ -130,7 +137,9 @@ export function useBorderSettings() {
       setSettings((current) => ({
         ...current,
         customHeight: Math.min(customSizeMax, Math.max(customSizeMin, Math.round(customHeight))),
-      })), 
+      })),
+    setFilterPresetId: (filterPresetId: FilterPresetId) =>
+      setSettings((current) => ({ ...current, filterPresetId })),
   }
 }
 

@@ -1,5 +1,5 @@
 import { Check, Download, Maximize2, Trash2 } from 'lucide-react'
-import type { ImageSizingMode } from '@/features/borders/types'
+import type { FilterAdjustments, ImageSizingMode } from '@/features/borders/types'
 import type { ImageQueueItem, OutputPreset } from '@/shared/types'
 import { PreviewCanvas } from '@/shared/components/PreviewCanvas'
 import { Tooltip } from '@/shared/components/Tooltip'
@@ -11,6 +11,7 @@ type ImageCardProps = {
   sizingMode: ImageSizingMode
   edgePixels: number
   borderWidthPixels: number
+  filterAdjustments?: FilterAdjustments
   isDownloading?: boolean
   isSelected?: boolean
   onRemove: () => void
@@ -26,6 +27,7 @@ export function ImageCard({
   sizingMode,
   edgePixels,
   borderWidthPixels,
+  filterAdjustments,
   isDownloading = false,
   isSelected = false,
   onRemove,
@@ -66,6 +68,7 @@ export function ImageCard({
                 sizingMode={sizingMode}
                 edgePixels={edgePixels}
                 borderWidthPixels={borderWidthPixels}
+                filterAdjustments={filterAdjustments}
                 label={`Preview for ${item.filename}`}
               />
             </div>

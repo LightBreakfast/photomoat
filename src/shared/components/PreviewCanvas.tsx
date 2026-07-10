@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 
-import type { ImageSizingMode } from '@/features/borders/types'
+import type { FilterAdjustments, ImageSizingMode } from '@/features/borders/types'
 import type { OutputPreset } from '@/shared/types'
 import { drawImageOnCanvas, getPreviewCanvasSize } from '@/features/borders/processing/canvasProcessor'
 import { loadImageElement } from '@/shared/utils/imageLoader'
@@ -12,6 +12,7 @@ type PreviewCanvasProps = {
   sizingMode: ImageSizingMode
   edgePixels: number
   borderWidthPixels: number
+  filterAdjustments?: FilterAdjustments
   label: string
   fullSize?: boolean
 }
@@ -27,6 +28,7 @@ export function PreviewCanvas({
   sizingMode,
   edgePixels,
   borderWidthPixels,
+  filterAdjustments,
   label,
   fullSize = false,
 }: PreviewCanvasProps) {
@@ -87,6 +89,7 @@ export function PreviewCanvas({
           sizingMode,
           edgePixels: scalePreviewPixels(edgePixels, scale),
           borderWidthPixels: scalePreviewPixels(borderWidthPixels, scale),
+          filterAdjustments,
         })
         setHasError(false)
       } catch {
@@ -101,7 +104,7 @@ export function PreviewCanvas({
     return () => {
       isMounted = false
     }
-  }, [backgroundColor, borderWidthPixels, edgePixels, fullSize, preset.height, preset.width, sizingMode, sourceUrl])
+  }, [backgroundColor, borderWidthPixels, edgePixels, filterAdjustments, fullSize, preset.height, preset.width, sizingMode, sourceUrl])
 
   if (hasError) {
     return (

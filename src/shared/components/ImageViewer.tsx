@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronLeft, ChevronRight, X } from 'lucide-react'
 
-import type { ImageSizingMode } from '@/features/borders/types'
+import type { FilterAdjustments, ImageSizingMode } from '@/features/borders/types'
 import type { ImageQueueItem, OutputPreset } from '@/shared/types'
 import { PreviewCanvas } from '@/shared/components/PreviewCanvas'
 
@@ -14,6 +14,10 @@ type ImageViewerProps = {
   sizingMode: ImageSizingMode
   edgePixels: number
   borderWidthPixels: number
+  filterAdjustments?: FilterAdjustments
+  isCompareActive?: boolean
+  onCompareStart?: () => void
+  onCompareEnd?: () => void
   onClose: () => void
   onNavigate: (index: number) => void
 }
@@ -26,6 +30,10 @@ export function ImageViewer({
   sizingMode,
   edgePixels,
   borderWidthPixels,
+  filterAdjustments,
+  isCompareActive = false,
+  onCompareStart,
+  onCompareEnd,
   onClose,
   onNavigate,
 }: ImageViewerProps) {
@@ -70,6 +78,24 @@ export function ImageViewer({
       <div className="flex h-12 shrink-0 items-center justify-between px-4">
         <p className="truncate text-sm text-foreground">{currentItem.filename}</p>
         <div className="flex items-center gap-3">
+          {onCompareStart && onCompareEnd ? (
+            <button
+              type="button"
+              aria-pressed={isCompareActive}
+              onPointerDown={onCompareStart}
+              onPointerUp={onCompareEnd}
+              onPointerLeave={onCompareEnd}
+              onPointerCancel={onCompareEnd}
+              className={[
+                'rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+                isCompareActive
+                  ? 'border-accent bg-surface-muted text-foreground'
+                  : 'border-border bg-surface text-muted hover:text-foreground active:bg-surface-muted',
+              ].join(' ')}
+            >
+              Hold to compare
+            </button>
+          ) : null}
           <span className="text-xs tabular-nums text-muted">
             {currentIndex + 1} / {items.length}
           </span>
@@ -107,6 +133,7 @@ export function ImageViewer({
             sizingMode={sizingMode}
             edgePixels={edgePixels}
             borderWidthPixels={borderWidthPixels}
+            filterAdjustments={filterAdjustments}
             label={`Full preview: ${currentItem.filename}`}
             fullSize
           />
