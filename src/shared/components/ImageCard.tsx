@@ -16,7 +16,7 @@ type ImageCardProps = {
   isSelected?: boolean
   onRemove: () => void
   onDownload: () => void | Promise<void>
-  onPreview?: () => void
+  onInspect?: () => void
   onToggleSelect?: (event: { metaKey: boolean; ctrlKey: boolean }) => void
 }
 
@@ -32,7 +32,7 @@ export function ImageCard({
   isSelected = false,
   onRemove,
   onDownload,
-  onPreview,
+  onInspect,
   onToggleSelect,
 }: ImageCardProps) {
   const dimensionsLabel =
@@ -49,7 +49,7 @@ export function ImageCard({
   return (
     <article
       className={[
-        'flex flex-col border bg-surface',
+        'self-start flex flex-col border bg-surface',
         isSelected ? 'border-accent' : 'border-border',
       ].join(' ')}
     >
@@ -93,16 +93,16 @@ export function ImageCard({
               </button>
             ) : null}
 
-            {/* Expand button */}
-            {onPreview ? (
+            {/* Inspect button */}
+            {onInspect ? (
               <button
                 type="button"
                 onClick={(event) => {
                   event.stopPropagation()
-                  onPreview()
+                  onInspect()
                 }}
                 className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md bg-background/80 text-muted opacity-0 transition-opacity group-hover:opacity-100"
-                aria-label={`Expand preview for ${item.filename}`}
+                aria-label={`Inspect ${item.filename}`}
               >
                 <Maximize2 size={14} />
               </button>

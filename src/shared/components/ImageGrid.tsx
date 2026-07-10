@@ -15,7 +15,7 @@ type ImageGridProps = {
   selectedIds?: Set<string>
   onRemove: (id: string) => void
   onDownload: (item: ImageQueueItem) => void | Promise<void>
-  onPreview?: (index: number) => void
+  onInspect?: (index: number) => void
   onToggleSelect?: (id: string, event: { metaKey: boolean; ctrlKey: boolean }) => void
 }
 
@@ -41,7 +41,7 @@ export function ImageGrid({
   selectedIds,
   onRemove,
   onDownload,
-  onPreview,
+  onInspect,
   onToggleSelect,
 }: ImageGridProps) {
   if (items.length === 0) {
@@ -49,7 +49,7 @@ export function ImageGrid({
   }
 
   return (
-    <div className={`grid gap-3 ${columnClasses[columns] ?? columnClasses[3]}`}>
+    <div className={`grid items-start gap-3 ${columnClasses[columns] ?? columnClasses[3]}`}>
       {items.map((item, index) => (
         <ImageCard
           key={item.id}
@@ -64,7 +64,7 @@ export function ImageGrid({
           isSelected={selectedIds?.has(item.id)}
           onRemove={() => onRemove(item.id)}
           onDownload={() => onDownload(item)}
-          onPreview={onPreview ? () => onPreview(index) : undefined}
+          onInspect={onInspect ? () => onInspect(index) : undefined}
           onToggleSelect={onToggleSelect ? (event) => onToggleSelect(item.id, event) : undefined}
         />
       ))}

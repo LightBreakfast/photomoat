@@ -12,10 +12,7 @@ import {
 
 type FilterControlsProps = {
   selectedPresetId: FilterPresetId
-  isCompareActive?: boolean
   onPresetChange: (presetId: FilterPresetId) => void
-  onCompareStart: () => void
-  onCompareEnd: () => void
 }
 
 function FilterIcon({ className }: { className?: string }) {
@@ -24,10 +21,7 @@ function FilterIcon({ className }: { className?: string }) {
 
 export function FilterControls({
   selectedPresetId,
-  isCompareActive = false,
   onPresetChange,
-  onCompareStart,
-  onCompareEnd,
 }: FilterControlsProps) {
   const selectedPreset = getFilterPresetById(selectedPresetId)
 
@@ -75,22 +69,6 @@ export function FilterControls({
         </Select>
       </div>
 
-      <button
-        type="button"
-        aria-pressed={isCompareActive}
-        onPointerDown={onCompareStart}
-        onPointerUp={onCompareEnd}
-        onPointerLeave={onCompareEnd}
-        onPointerCancel={onCompareEnd}
-        className={[
-          'w-full rounded-md border px-2.5 py-1.5 text-xs font-medium transition-colors',
-          isCompareActive
-            ? 'border-accent bg-surface-muted text-foreground'
-            : 'border-border bg-surface text-muted hover:text-foreground active:bg-surface-muted',
-        ].join(' ')}
-      >
-        Hold to compare
-      </button>
     </div>
   )
 }
