@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from 'react'
 import { Palette } from 'lucide-react'
 
 import type { ImageSizingMode } from '@/features/borders/types'
@@ -9,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ScrubberInput } from '@/shared/components/ScrubberInput'
 
 const swatches = ['#ffffff', '#000000', '#f5f5f5', '#e2e2e2', '#d4d4d4', '#1a1a1a']
 
@@ -25,66 +25,6 @@ type BorderControlsProps = {
 
 function isEdgeSizingMode(mode: ImageSizingMode) {
   return mode === 'long-edge' || mode === 'short-edge'
-}
-
-function UncontrolledNumberInput({
-  label,
-  value,
-  disabled,
-  min = 1,
-  onChange,
-  ariaLabel,
-}: {
-  label: string
-  value: number
-  disabled?: boolean
-  min?: number
-  onChange: (value: number) => void
-  ariaLabel: string
-}) {
-  const [localValue, setLocalValue] = useState(String(value))
-  const lastPropRef = useRef(value)
-
-  useEffect(() => {
-    if (lastPropRef.current !== value) {
-      lastPropRef.current = value
-      setLocalValue(String(value))
-    }
-  }, [value])
-
-  const commit = () => {
-    const parsed = Number(localValue)
-
-    if (Number.isFinite(parsed) && parsed >= min) {
-      onChange(Math.round(parsed))
-    } else {
-      setLocalValue(String(lastPropRef.current))
-    }
-  }
-
-  if (disabled) {
-    return null
-  }
-
-  return (
-    <label className="block">
-      <span className="text-xs font-medium text-muted">{label}</span>
-      <input
-        type="text"
-        inputMode="numeric"
-        value={localValue}
-        onChange={(event) => setLocalValue(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event) => {
-          if (event.key === 'Enter') {
-            commit()
-          }
-        }}
-        className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
-        aria-label={ariaLabel}
-      />
-    </label>
-  )
 }
 
 export function BorderControls({
@@ -154,6 +94,7 @@ export function BorderControls({
                     'long-edge': 'Long edge',
                     'short-edge': 'Short edge',
                     'border-width': 'Border width',
+                    fill: 'Fill (no border)',
                   }
                   return labels[value] ?? value
                 }}
@@ -164,22 +105,23 @@ export function BorderControls({
               <SelectItem value="long-edge">Long edge</SelectItem>
               <SelectItem value="short-edge">Short edge</SelectItem>
               <SelectItem value="border-width">Border width</SelectItem>
+              <SelectItem value="fill">Fill (no border)</SelectItem>
             </SelectContent>
           </Select>
         </label>
 
-        <UncontrolledNumberInput
+        <ScrubberInput
           label="Edge size (px)"
           value={imageEdgePixels}
-          disabled={!isEdgeSizingMode(imageSizingMode)}
+          disabled={imageSizingMode === 'fill' || !isEdgeSizingMode(imageSizingMode)}
           onChange={onImageEdgePixelsChange}
           ariaLabel="Target edge size in pixels"
         />
 
-        <UncontrolledNumberInput
+        <ScrubberInput
           label="Border width (px)"
           value={borderWidthPixels}
-          disabled={imageSizingMode !== 'border-width'}
+          disabled={imageSizingMode === 'fill' || imageSizingMode !== 'border-width'}
           onChange={onBorderWidthPixelsChange}
           ariaLabel="Border width in pixels"
         />

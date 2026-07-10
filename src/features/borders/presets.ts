@@ -1,3 +1,7 @@
+import {
+  defaultCustomHeight,
+  defaultCustomWidth,
+} from '@/features/borders/constants'
 import type { OutputPreset, OutputPresetId } from '@/shared/types'
 
 export const instagramPresets: OutputPreset[] = [
@@ -27,6 +31,25 @@ export const instagramPresets: OutputPreset[] = [
   },
 ]
 
-export function getPresetById(presetId: OutputPresetId) {
+export const customPreset: OutputPreset = {
+  id: 'custom',
+  label: 'Custom',
+  width: defaultCustomWidth,
+  height: defaultCustomHeight,
+}
+
+export function getPresetById(
+  presetId: OutputPresetId,
+  customWidth = defaultCustomWidth,
+  customHeight = defaultCustomHeight,
+) {
+  if (presetId === 'custom') {
+    return {
+      ...customPreset,
+      width: customWidth,
+      height: customHeight,
+    }
+  }
+
   return instagramPresets.find((preset) => preset.id === presetId) ?? instagramPresets[0]
 }

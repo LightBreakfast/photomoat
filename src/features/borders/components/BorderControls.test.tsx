@@ -114,4 +114,22 @@ describe('BorderControls', () => {
     expect(screen.queryByLabelText(/target edge size in pixels/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/border width in pixels/i)).not.toBeInTheDocument()
   })
+
+  it('hides edge and border inputs when mode is fill', () => {
+    render(
+      <BorderControls
+        backgroundColor="#ffffff"
+        imageSizingMode="fill"
+        imageEdgePixels={900}
+        borderWidthPixels={90}
+        onBackgroundColorChange={vi.fn()}
+        onImageSizingModeChange={vi.fn()}
+        onImageEdgePixelsChange={vi.fn()}
+        onBorderWidthPixelsChange={vi.fn()}
+      />,
+    )
+
+    expect(screen.queryByLabelText(/target edge size in pixels/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/border width in pixels/i)).not.toBeInTheDocument()
+  })
 })

@@ -5,6 +5,7 @@ export type OutputPresetId =
   | 'instagram-portrait'
   | 'instagram-landscape'
   | 'instagram-story'
+  | 'custom'
 
 export type OutputPreset = {
   id: OutputPresetId

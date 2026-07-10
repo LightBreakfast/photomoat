@@ -110,6 +110,16 @@ export function calculateImagePlacementRect({
     }
   }
 
+  if (sizingMode === 'fill') {
+    const scale = Math.max(targetWidth / sourceWidth, targetHeight / sourceHeight)
+    const drawWidth = sourceWidth * scale
+    const drawHeight = sourceHeight * scale
+    const x = (targetWidth - drawWidth) / 2
+    const y = (targetHeight - drawHeight) / 2
+
+    return { scale, drawWidth, drawHeight, x, y }
+  }
+
   if (sizingMode === 'contain' || !edgePixels || edgePixels <= 0) {
     return containRect
   }
