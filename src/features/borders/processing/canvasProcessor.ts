@@ -68,15 +68,8 @@ export function calculateContainRect({
   return { scale, drawWidth, drawHeight, x, y }
 }
 
-function getClampedBorderWidth(borderWidthPixels: number, targetWidth: number, targetHeight: number) {
-  return Math.max(
-    0,
-    Math.min(
-      Math.round(borderWidthPixels),
-      Math.floor((targetWidth - 1) / 2),
-      Math.floor((targetHeight - 1) / 2),
-    ),
-  )
+function getClampedHorizontalPadding(borderWidthPixels: number, targetWidth: number) {
+  return Math.max(0, Math.min(Math.round(borderWidthPixels), Math.floor((targetWidth - 1) / 2)))
 }
 
 export function calculateImagePlacementRect({
@@ -96,20 +89,20 @@ export function calculateImagePlacementRect({
   })
 
   if (sizingMode === 'border-width' && borderWidthPixels && borderWidthPixels > 0) {
-    const clampedBorderWidth = getClampedBorderWidth(borderWidthPixels, targetWidth, targetHeight)
-    const innerRect = calculateContainRect({
+    const clampedHorizontalPadding = getClampedHorizontalPadding(borderWidthPixels, targetWidth)
+    const contentRect = calculateContainRect({
       sourceWidth,
       sourceHeight,
-      targetWidth: targetWidth - clampedBorderWidth * 2,
-      targetHeight: targetHeight - clampedBorderWidth * 2,
+      targetWidth: targetWidth - clampedHorizontalPadding * 2,
+      targetHeight,
     })
 
     return {
-      scale: innerRect.scale,
-      drawWidth: innerRect.drawWidth,
-      drawHeight: innerRect.drawHeight,
-      x: clampedBorderWidth + innerRect.x,
-      y: clampedBorderWidth + innerRect.y,
+      scale: contentRect.scale,
+      drawWidth: contentRect.drawWidth,
+      drawHeight: contentRect.drawHeight,
+      x: clampedHorizontalPadding + contentRect.x,
+      y: contentRect.y,
     }
   }
 

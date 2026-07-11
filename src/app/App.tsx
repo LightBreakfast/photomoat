@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Info } from 'lucide-react'
 
 import { BorderToolPage } from '@/features/borders/BorderToolPage'
+import { GitHubMarkIcon } from '@/shared/components/icons/GitHubMarkIcon'
 import { ThemeToggle } from '@/shared/components/ThemeToggle'
 
 export default function App() {
@@ -14,6 +15,15 @@ export default function App() {
           PhotoMoat
         </p>
         <div className="flex items-center gap-2">
+          <a
+            href="https://github.com/LightBreakfast/photomoat"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted hover:text-foreground"
+            aria-label="Open PhotoMoat GitHub repository"
+          >
+            <GitHubMarkIcon className="size-4" />
+          </a>
           <div className="relative">
             <button
               type="button"
