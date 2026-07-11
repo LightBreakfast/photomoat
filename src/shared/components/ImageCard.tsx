@@ -1,8 +1,21 @@
-import { Check, Download, Maximize2, Trash2 } from 'lucide-react'
+import { Check, Download, Maximize2, MoreHorizontal, Trash2 } from 'lucide-react'
 import type { FilterAdjustments, ImageSizingMode } from '@/features/borders/types'
 import type { ImageQueueItem, OutputPreset } from '@/shared/types'
 import { PreviewCanvas } from '@/shared/components/PreviewCanvas'
 import { Tooltip } from '@/shared/components/Tooltip'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+
+export type CardMenuAction = {
+  label: string
+  icon?: React.ReactNode
+  disabled?: boolean
+  onClick: () => void
+}
 
 type ImageCardProps = {
   item: ImageQueueItem
@@ -14,6 +27,7 @@ type ImageCardProps = {
   filterAdjustments?: FilterAdjustments
   isDownloading?: boolean
   isSelected?: boolean
+  menuActions?: CardMenuAction[]
   onRemove: () => void
   onDownload: () => void | Promise<void>
   onInspect?: () => void
@@ -30,6 +44,7 @@ export function ImageCard({
   filterAdjustments,
   isDownloading = false,
   isSelected = false,
+  menuActions,
   onRemove,
   onDownload,
   onInspect,
@@ -46,6 +61,8 @@ export function ImageCard({
     }
   }
 
+  const hasMenuActions = menuActions && menuActions.length > 0
+
   return (
     <article
       className={[
@@ -60,7 +77,10 @@ export function ImageCard({
           </div>
         ) : (
           <>
-            <div onClick={handlePreviewClick} className="cursor-pointer">
+            <div
+              onClick={handlePreviewClick}
+              className="aspect-square cursor-pointer overflow-hidden bg-surface-muted"
+            >
               <PreviewCanvas
                 sourceUrl={item.objectUrl}
                 preset={preset}
@@ -85,7 +105,7 @@ export function ImageCard({
                   'absolute left-2 top-2 flex h-5 w-5 items-center justify-center rounded border transition-opacity',
                   isSelected
                     ? 'border-accent bg-accent text-accent-foreground opacity-100'
-                    : 'border-border bg-background/80 text-transparent opacity-0 group-hover:opacity-100',
+                    : 'border-border bg-background/80 text-transparent opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
                 ].join(' ')}
                 aria-label={isSelected ? `Deselect ${item.filename}` : `Select ${item.filename}`}
               >
@@ -93,20 +113,58 @@ export function ImageCard({
               </button>
             ) : null}
 
-            {/* Inspect button */}
-            {onInspect ? (
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onInspect()
-                }}
-                className="absolute right-2 top-2 flex h-7 w-7 items-center justify-center rounded-md bg-background/80 text-muted opacity-0 transition-opacity group-hover:opacity-100"
-                aria-label={`Inspect ${item.filename}`}
-              >
-                <Maximize2 size={14} />
-              </button>
-            ) : null}
+            {/* Top-right action buttons */}
+            <div className="absolute right-2 top-2 flex items-center gap-1">
+              {/* Inspect button */}
+              {onInspect ? (
+                <button
+                  type="button"
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    onInspect()
+                  }}
+                  className={[
+                    'flex h-7 w-7 items-center justify-center rounded-md bg-background/80 text-muted transition-opacity',
+                    isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
+                  ].join(' ')}
+                  aria-label={`Inspect ${item.filename}`}
+                >
+                  <Maximize2 size={14} />
+                </button>
+              ) : null}
+
+              {/* Context menu */}
+              {hasMenuActions ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger
+                    render={
+                      <button
+                        type="button"
+                        className={[
+                          'flex h-7 w-7 items-center justify-center rounded-md bg-background/80 text-muted transition-opacity',
+                          isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
+                        ].join(' ')}
+                        aria-label={`More actions for ${item.filename}`}
+                      />
+                    }
+                  >
+                    <MoreHorizontal size={14} />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent side="bottom" align="end" sideOffset={4}>
+                    {menuActions.map((action, index) => (
+                      <DropdownMenuItem
+                        key={index}
+                        disabled={action.disabled}
+                        onClick={action.onClick}
+                      >
+                        {action.icon}
+                        {action.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
+            </div>
           </>
         )}
       </div>
@@ -119,37 +177,37 @@ export function ImageCard({
           ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
-            <Tooltip label="Remove">
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation()
-                  onRemove()
-                }}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-muted hover:text-foreground"
-                aria-label={`Remove ${item.filename}`}
-              >
-                <Trash2 size={14} />
-              </button>
-            </Tooltip>
-            <Tooltip label="Download">
-              <button
-                type="button"
-                disabled={item.status !== 'ready' || isDownloading}
-                onClick={(event) => {
-                  event.stopPropagation()
-                  void onDownload()
-                }}
-                className="flex h-7 w-7 items-center justify-center rounded-md text-muted disabled:cursor-not-allowed disabled:opacity-50 hover:text-foreground"
-                aria-label={`Download ${item.filename}`}
-              >
-                {isDownloading ? (
-                  <span className="text-xs">…</span>
-                ) : (
-                  <Download size={14} />
-                )}
-              </button>
-            </Tooltip>
+          <Tooltip label="Remove">
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation()
+                onRemove()
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-muted hover:text-foreground"
+              aria-label={`Remove ${item.filename}`}
+            >
+              <Trash2 size={14} />
+            </button>
+          </Tooltip>
+          <Tooltip label="Download">
+            <button
+              type="button"
+              disabled={item.status !== 'ready' || isDownloading}
+              onClick={(event) => {
+                event.stopPropagation()
+                void onDownload()
+              }}
+              className="flex h-7 w-7 items-center justify-center rounded-md text-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              aria-label={`Download ${item.filename}`}
+            >
+              {isDownloading ? (
+                <span className="text-xs">…</span>
+              ) : (
+                <Download size={14} />
+              )}
+            </button>
+          </Tooltip>
         </div>
       </div>
     </article>

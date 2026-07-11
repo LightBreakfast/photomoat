@@ -2,11 +2,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
-import {
-  ThemeProvider,
-  getStoredTheme,
-  themeStorageKey,
-} from '@/app/providers/ThemeProvider'
+import { ThemeProvider } from '@/app/providers/ThemeProvider'
+import { getStoredTheme, themeStorageKey } from '@/app/providers/theme'
 import { useTheme } from '@/shared/hooks/useTheme'
 
 function mockMatchMedia(matches: boolean) {

@@ -21,6 +21,7 @@ type BorderControlsProps = {
   onImageSizingModeChange: (mode: ImageSizingMode) => void
   onImageEdgePixelsChange: (pixels: number) => void
   onBorderWidthPixelsChange: (pixels: number) => void
+  disabled?: boolean
 }
 
 function isEdgeSizingMode(mode: ImageSizingMode) {
@@ -36,6 +37,7 @@ export function BorderControls({
   onImageSizingModeChange,
   onImageEdgePixelsChange,
   onBorderWidthPixelsChange,
+  disabled = false,
 }: BorderControlsProps) {
   return (
     <div className="space-y-5">
@@ -51,7 +53,8 @@ export function BorderControls({
               aria-label={`Use ${swatch} background`}
               aria-pressed={swatch.toLowerCase() === backgroundColor.toLowerCase()}
               onClick={() => onBackgroundColorChange(swatch)}
-              className="h-7 w-7 rounded-md border border-border"
+              disabled={disabled}
+              className="h-7 w-7 rounded-md border border-border disabled:cursor-not-allowed disabled:opacity-50"
               style={{ backgroundColor: swatch }}
             />
           ))}
@@ -61,6 +64,7 @@ export function BorderControls({
               type="color"
               value={backgroundColor}
               onChange={(event) => onBackgroundColorChange(event.target.value)}
+              disabled={disabled}
               className="sr-only"
               aria-label="Pick custom background colour"
             />
@@ -70,7 +74,8 @@ export function BorderControls({
           type="text"
           value={backgroundColor}
           onChange={(event) => onBackgroundColorChange(event.target.value)}
-          className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm"
+          disabled={disabled}
+          className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           inputMode="text"
           aria-label="Background colour hex value"
         />
@@ -85,6 +90,7 @@ export function BorderControls({
           <Select
             value={imageSizingMode}
             onValueChange={(value) => onImageSizingModeChange(value as ImageSizingMode)}
+            disabled={disabled}
           >
             <SelectTrigger className="w-full" aria-label="Image sizing mode">
               <SelectValue>
@@ -113,7 +119,7 @@ export function BorderControls({
         <ScrubberInput
           label="Edge size (px)"
           value={imageEdgePixels}
-          disabled={imageSizingMode === 'fill' || !isEdgeSizingMode(imageSizingMode)}
+          disabled={disabled || imageSizingMode === 'fill' || !isEdgeSizingMode(imageSizingMode)}
           onChange={onImageEdgePixelsChange}
           ariaLabel="Target edge size in pixels"
         />
@@ -121,7 +127,7 @@ export function BorderControls({
         <ScrubberInput
           label="Border width (px)"
           value={borderWidthPixels}
-          disabled={imageSizingMode === 'fill' || imageSizingMode !== 'border-width'}
+          disabled={disabled || imageSizingMode === 'fill' || imageSizingMode !== 'border-width'}
           onChange={onBorderWidthPixelsChange}
           ariaLabel="Border width in pixels"
         />

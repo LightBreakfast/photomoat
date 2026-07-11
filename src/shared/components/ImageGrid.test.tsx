@@ -2,14 +2,31 @@ import { fireEvent, render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 
 import { ImageGrid } from '@/shared/components/ImageGrid'
-import type { ImageQueueItem, OutputPreset } from '@/shared/types'
+import type { ImageEditRecipe } from '@/features/borders/types'
+import type { ImageQueueItem } from '@/shared/types'
 
-const preset: OutputPreset = {
-  id: 'instagram-square',
-  label: 'Square Post',
-  width: 1080,
-  height: 1080,
+const defaultRecipe: ImageEditRecipe = {
+  presetId: 'instagram-square',
+  backgroundColor: '#ffffff',
+  imageSizingMode: 'contain',
+  imageEdgePixels: 900,
+  borderWidthPixels: 90,
+  customWidth: 1080,
+  customHeight: 1080,
+  filterPresetId: 'original',
 }
+
+const defaultFilterAdjustments = {
+  brightness: 100,
+  contrast: 100,
+  saturation: 100,
+  grayscale: 0,
+  sepia: 0,
+  hueRotate: 0,
+}
+
+const getItemRecipe = () => defaultRecipe
+const getItemFilterAdjustments = () => defaultFilterAdjustments
 
 const item: ImageQueueItem = {
   id: '1',
@@ -28,11 +45,8 @@ describe('ImageGrid', () => {
     const { container } = render(
       <ImageGrid
         items={[]}
-        preset={preset}
-        backgroundColor="#ffffff"
-        sizingMode="contain"
-        edgePixels={900}
-        borderWidthPixels={90}
+        getItemRecipe={getItemRecipe}
+        getItemFilterAdjustments={getItemFilterAdjustments}
         onRemove={vi.fn()}
         onDownload={vi.fn()}
       />,
@@ -45,11 +59,8 @@ describe('ImageGrid', () => {
     render(
       <ImageGrid
         items={[item]}
-        preset={preset}
-        backgroundColor="#ffffff"
-        sizingMode="contain"
-        edgePixels={900}
-        borderWidthPixels={90}
+        getItemRecipe={getItemRecipe}
+        getItemFilterAdjustments={getItemFilterAdjustments}
         onRemove={vi.fn()}
         onDownload={vi.fn()}
       />,
@@ -63,11 +74,8 @@ describe('ImageGrid', () => {
     const { container } = render(
       <ImageGrid
         items={[item]}
-        preset={preset}
-        backgroundColor="#ffffff"
-        sizingMode="contain"
-        edgePixels={900}
-        borderWidthPixels={90}
+        getItemRecipe={getItemRecipe}
+        getItemFilterAdjustments={getItemFilterAdjustments}
         onRemove={vi.fn()}
         onDownload={vi.fn()}
       />,
@@ -86,11 +94,8 @@ describe('ImageGrid', () => {
             error: undefined,
           },
         ]}
-        preset={preset}
-        backgroundColor="#ffffff"
-        sizingMode="contain"
-        edgePixels={900}
-        borderWidthPixels={90}
+        getItemRecipe={getItemRecipe}
+        getItemFilterAdjustments={getItemFilterAdjustments}
         onRemove={vi.fn()}
         onDownload={vi.fn()}
         onInspect={vi.fn()}
@@ -114,11 +119,8 @@ describe('ImageGrid', () => {
             error: undefined,
           },
         ]}
-        preset={preset}
-        backgroundColor="#ffffff"
-        sizingMode="contain"
-        edgePixels={900}
-        borderWidthPixels={90}
+        getItemRecipe={getItemRecipe}
+        getItemFilterAdjustments={getItemFilterAdjustments}
         selectedIds={new Set(['1'])}
         onRemove={vi.fn()}
         onDownload={vi.fn()}
@@ -141,11 +143,8 @@ describe('ImageGrid', () => {
             error: undefined,
           },
         ]}
-        preset={preset}
-        backgroundColor="#ffffff"
-        sizingMode="contain"
-        edgePixels={900}
-        borderWidthPixels={90}
+        getItemRecipe={getItemRecipe}
+        getItemFilterAdjustments={getItemFilterAdjustments}
         onRemove={vi.fn()}
         onDownload={vi.fn()}
         onToggleSelect={onToggleSelect}

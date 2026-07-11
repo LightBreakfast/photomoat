@@ -173,7 +173,7 @@ describe('ScrubberInput', () => {
     fireEvent.mouseUp(document)
   })
 
-  it('does not change value when disabled', () => {
+  it('renders a disabled input when disabled', () => {
     const onChange = vi.fn()
 
     render(
@@ -186,7 +186,7 @@ describe('ScrubberInput', () => {
       />,
     )
 
-    expect(screen.queryByText('Width (px)')).not.toBeInTheDocument()
-    expect(screen.queryByLabelText('Width in pixels')).not.toBeInTheDocument()
+    expect(screen.getByText('Width (px)')).toBeInTheDocument()
+    expect(screen.getByLabelText('Width in pixels')).toBeDisabled()
   })
 })

@@ -1,42 +1,16 @@
 import {
-  createContext,
   useEffect,
   useMemo,
   useState,
   type PropsWithChildren,
 } from 'react'
 
-const storageKey = 'photomoat-theme'
-
-export type ThemePreference = 'light' | 'dark'
-
-export type ThemeContextValue = {
-  theme: ThemePreference
-  setTheme: (theme: ThemePreference) => void
-  toggleTheme: () => void
-}
-
-function getSystemTheme(): ThemePreference {
-  if (typeof window === 'undefined') {
-    return 'dark'
-  }
-
-  return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
-}
-
-function getStoredTheme(): ThemePreference {
-  if (typeof window === 'undefined') {
-    return 'dark'
-  }
-
-  const storedValue = window.localStorage.getItem(storageKey)
-
-  return storedValue === 'light' || storedValue === 'dark'
-    ? storedValue
-    : getSystemTheme()
-}
-
-export const ThemeContext = createContext<ThemeContextValue | null>(null)
+import {
+  getStoredTheme,
+  ThemeContext,
+  type ThemePreference,
+  themeStorageKey,
+} from '@/app/providers/theme'
 
 export function ThemeProvider({ children }: PropsWithChildren) {
   const [theme, setTheme] = useState<ThemePreference>(() => getStoredTheme())
@@ -44,11 +18,11 @@ export function ThemeProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     document.documentElement.classList.toggle('dark', theme === 'dark')
     document.documentElement.dataset.theme = theme
-    window.localStorage.setItem(storageKey, theme)
+    window.localStorage.setItem(themeStorageKey, theme)
   }, [theme])
 
   useEffect(() => {
-    if (window.localStorage.getItem(storageKey)) {
+    if (window.localStorage.getItem(themeStorageKey)) {
       return undefined
     }
 
@@ -76,5 +50,3 @@ export function ThemeProvider({ children }: PropsWithChildren) {
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
 }
-
-export { getSystemTheme, getStoredTheme, storageKey as themeStorageKey }
