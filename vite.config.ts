@@ -7,6 +7,9 @@ import { defineConfig } from 'vite'
 export default defineConfig({
   base: '/photomoat/',
   plugins: [react(), tailwindcss()],
+  build: {
+    chunkSizeWarningLimit: 700,
+  },
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

@@ -54,7 +54,7 @@ export function BorderToolPage() {
   // Per-image edit state (in-memory)
   const {
     initializeImages,
-    removeImage: removeImageRecipe,
+    removeImages: removeImageRecipes,
     patchImage,
     replaceImagesWithRecipe,
     getRecipe,
@@ -99,11 +99,11 @@ export function BorderToolPage() {
     // Clean up recipes for removed items
     const removedIds = [...prevItemIdsRef.current].filter((id) => !currentIds.has(id))
     if (removedIds.length > 0) {
-      removeImageRecipe(removedIds)
+      removeImageRecipes(removedIds)
     }
 
     prevItemIdsRef.current = currentIds
-  }, [items, initializeImages, removeImageRecipe])
+  }, [items, initializeImages, removeImageRecipes])
 
   // --- Edit target derivation ---
   const selectedReadyItems = useMemo(
