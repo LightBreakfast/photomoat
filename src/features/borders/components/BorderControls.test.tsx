@@ -90,14 +90,14 @@ describe('BorderControls', () => {
       />,
     )
 
-    const input = screen.getByLabelText(/border width in pixels/i)
+    const input = screen.getByLabelText(/horizontal padding in pixels/i)
     fireEvent.change(input, { target: { value: '72' } })
     fireEvent.blur(input)
 
     expect(onBorderWidthPixelsChange).toHaveBeenCalledWith(72)
   })
 
-  it('disables edge and border inputs when mode is contain', () => {
+  it('does not render extra size inputs when mode is contain', () => {
     render(
       <BorderControls
         backgroundColor="#ffffff"
@@ -111,11 +111,12 @@ describe('BorderControls', () => {
       />,
     )
 
-    expect(screen.getByLabelText(/target edge size in pixels/i)).toBeDisabled()
-    expect(screen.getByLabelText(/border width in pixels/i)).toBeDisabled()
+    expect(screen.queryByLabelText(/target edge size in pixels/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/horizontal padding in pixels/i)).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/image sizing mode/i)).toBeInTheDocument()
   })
 
-  it('disables edge and border inputs when mode is fill', () => {
+  it('does not render extra size inputs when mode is fill', () => {
     render(
       <BorderControls
         backgroundColor="#ffffff"
@@ -129,7 +130,8 @@ describe('BorderControls', () => {
       />,
     )
 
-    expect(screen.getByLabelText(/target edge size in pixels/i)).toBeDisabled()
-    expect(screen.getByLabelText(/border width in pixels/i)).toBeDisabled()
+    expect(screen.queryByLabelText(/target edge size in pixels/i)).not.toBeInTheDocument()
+    expect(screen.queryByLabelText(/horizontal padding in pixels/i)).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/image sizing mode/i)).toBeInTheDocument()
   })
 })

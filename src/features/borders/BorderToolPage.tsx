@@ -7,7 +7,7 @@ import {
   Copy,
   Grid3X3,
   Pencil,
-  Settings,
+  Package,
   Square,
 } from 'lucide-react'
 
@@ -16,6 +16,7 @@ import { BrowseWorkspace } from '@/features/borders/components/BrowseWorkspace'
 import { FilterControls } from '@/features/borders/components/FilterControls'
 import { InspectWorkspace } from '@/features/borders/components/InspectWorkspace'
 import { PresetSelector } from '@/features/borders/components/PresetSelector'
+import { SidebarSection } from '@/features/borders/components/SidebarSection'
 import { WorkspaceFooterIconButton } from '@/features/borders/components/WorkspaceFooterIconButton'
 import { WorkspaceModeToggle } from '@/features/borders/components/WorkspaceModeToggle'
 import { resolveFilterAdjustments } from '@/features/borders/filterPresets'
@@ -367,7 +368,7 @@ export function BorderToolPage() {
     return canvasToBlob(canvas, exportSettings.outputFormat, exportSettings.jpegQuality)
   }
 
-  const handleSingleDownload = async (item: ImageQueueItem) => {
+  const handleSingleExport = async (item: ImageQueueItem) => {
     setActiveDownloadId(item.id)
     setItemStatus(item.id, 'processing')
     setProgressMessage(`Preparing ${item.filename}…`)
@@ -385,20 +386,20 @@ export function BorderToolPage() {
     }
   }
 
-  const handleBatchExport = async () => {
-    if (exportItems.length === 0) {
+  const handleZipExport = async (itemsToExport: ImageQueueItem[]) => {
+    if (itemsToExport.length === 0) {
       setProgressMessage('No images to export.')
       return
     }
 
-    setProgress({ current: 0, total: exportItems.length })
+    setProgress({ current: 0, total: itemsToExport.length })
     setProgressMessage(
-      `Preparing ${exportItems.length} image${exportItems.length > 1 ? 's' : ''}…`,
+      `Preparing ${itemsToExport.length} image${itemsToExport.length > 1 ? 's' : ''}…`,
     )
 
     try {
       await exportZip({
-        items: exportItems,
+        items: itemsToExport,
         zipFilename: 'photomoat-borders.zip',
         createEntry: async (item) => {
           setItemStatus(item.id, 'processing')
@@ -427,6 +428,20 @@ export function BorderToolPage() {
     } finally {
       setProgress(null)
     }
+  }
+
+  const handleExport = async () => {
+    if (exportItems.length === 0) {
+      setProgressMessage('No images to export.')
+      return
+    }
+
+    if (exportItems.length === 1) {
+      await handleSingleExport(exportItems[0])
+      return
+    }
+
+    await handleZipExport(exportItems)
   }
 
   // --- Navigation ---
@@ -523,21 +538,20 @@ export function BorderToolPage() {
 
   const rightPanelContent = (
     <div className="space-y-5">
-      <PresetSelector
-        instagramPresets={instagramPresets}
-        selectedPresetId={directRecipe.presetId}
-        onChange={handlePresetIdChange}
-        customWidth={directRecipe.customWidth}
-        customHeight={directRecipe.customHeight}
-        onCustomWidthChange={handleCustomWidthChange}
-        onCustomHeightChange={handleCustomHeightChange}
-        disabled={!isDirectEditEnabled}
-      />
+      <SidebarSection title="Dimensions">
+        <PresetSelector
+          instagramPresets={instagramPresets}
+          selectedPresetId={directRecipe.presetId}
+          onChange={handlePresetIdChange}
+          customWidth={directRecipe.customWidth}
+          customHeight={directRecipe.customHeight}
+          onCustomWidthChange={handleCustomWidthChange}
+          onCustomHeightChange={handleCustomHeightChange}
+          disabled={!isDirectEditEnabled}
+        />
+      </SidebarSection>
 
-      <div className="space-y-3 border-t border-border pt-3">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted">
-          Border
-        </p>
+      <SidebarSection title="Border">
         <BorderControls
           backgroundColor={directRecipe.backgroundColor}
           imageSizingMode={directRecipe.imageSizingMode}
@@ -549,13 +563,10 @@ export function BorderToolPage() {
           onBorderWidthPixelsChange={handleBorderWidthPixelsChange}
           disabled={!isDirectEditEnabled}
         />
-      </div>
+      </SidebarSection>
 
       {items.length > 0 ? (
-        <div className="space-y-3 border-t border-border pt-3">
-          <p className="text-xs font-medium uppercase tracking-wider text-muted">
-            Export
-          </p>
+        <SidebarSection title="Export">
           <ExportControls
             variant="batch"
             disabled={exportItems.length === 0}
@@ -563,13 +574,13 @@ export function BorderToolPage() {
             jpegQuality={exportSettings.jpegQuality}
             onOutputFormatChange={setOutputFormat}
             onJpegQualityChange={setJpegQuality}
-            onBatchExport={handleBatchExport}
+            exportCount={exportItems.length}
+            onExport={handleExport}
             progressMessage={progressMessage}
             progress={progress}
           />
-        </div>
+        </SidebarSection>
       ) : null}
-
     </div>
   )
 
@@ -598,7 +609,7 @@ export function BorderToolPage() {
                 className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-xs text-muted hover:text-foreground"
                 aria-label="Open output controls"
               >
-                <Settings size={16} />
+                <Package size={16} />
                 Output
               </button>
             ) : null}
@@ -624,7 +635,7 @@ export function BorderToolPage() {
                 activeDownloadId={activeDownloadId}
                 selectedIds={selectedIds}
                 onRemove={handleRemoveItem}
-                onDownload={handleSingleDownload}
+                onDownload={handleSingleExport}
                 onInspect={handleInspect}
                 onToggleSelect={handleToggleSelect}
               />

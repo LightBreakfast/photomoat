@@ -99,7 +99,7 @@ export function BorderControls({
                     contain: 'Auto fit',
                     'long-edge': 'Long edge',
                     'short-edge': 'Short edge',
-                    'border-width': 'Border width',
+                    'border-width': 'Side padding',
                     fill: 'Fill (no border)',
                   }
                   return labels[value] ?? value
@@ -110,27 +110,33 @@ export function BorderControls({
               <SelectItem value="contain">Auto fit</SelectItem>
               <SelectItem value="long-edge">Long edge</SelectItem>
               <SelectItem value="short-edge">Short edge</SelectItem>
-              <SelectItem value="border-width">Border width</SelectItem>
+              <SelectItem value="border-width">Side padding</SelectItem>
               <SelectItem value="fill">Fill (no border)</SelectItem>
             </SelectContent>
           </Select>
         </label>
 
-        <ScrubberInput
-          label="Edge size (px)"
-          value={imageEdgePixels}
-          disabled={disabled || imageSizingMode === 'fill' || !isEdgeSizingMode(imageSizingMode)}
-          onChange={onImageEdgePixelsChange}
-          ariaLabel="Target edge size in pixels"
-        />
+        {isEdgeSizingMode(imageSizingMode) ? (
+          <ScrubberInput
+            label="Edge"
+            value={imageEdgePixels}
+            disabled={disabled}
+            onChange={onImageEdgePixelsChange}
+            ariaLabel="Target edge size in pixels"
+            layout="inline"
+          />
+        ) : null}
 
-        <ScrubberInput
-          label="Border width (px)"
-          value={borderWidthPixels}
-          disabled={disabled || imageSizingMode === 'fill' || imageSizingMode !== 'border-width'}
-          onChange={onBorderWidthPixelsChange}
-          ariaLabel="Border width in pixels"
-        />
+        {imageSizingMode === 'border-width' ? (
+          <ScrubberInput
+            label="Sides"
+            value={borderWidthPixels}
+            disabled={disabled}
+            onChange={onBorderWidthPixelsChange}
+            ariaLabel="Horizontal padding in pixels"
+            layout="inline"
+          />
+        ) : null}
       </div>
     </div>
   )

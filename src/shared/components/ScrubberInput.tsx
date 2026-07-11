@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+type ScrubberInputLayout = 'stacked' | 'inline'
+
 type ScrubberInputProps = {
   label: string
   value: number
@@ -9,6 +11,7 @@ type ScrubberInputProps = {
   step?: number
   onChange: (value: number) => void
   ariaLabel: string
+  layout?: ScrubberInputLayout
 }
 
 export function ScrubberInput({
@@ -20,6 +23,7 @@ export function ScrubberInput({
   step = 1,
   onChange,
   ariaLabel,
+  layout = 'stacked',
 }: ScrubberInputProps) {
   const [localValue, setLocalValue] = useState(String(value))
   const [isDragging, setIsDragging] = useState(false)
@@ -88,12 +92,21 @@ export function ScrubberInput({
     [disabled, value, step, clampValue, onChange],
   )
 
+  const isInline = layout === 'inline'
+
   return (
-    <label className="block min-w-0 space-y-1">
+    <label
+      className={
+        isInline
+          ? 'flex items-center justify-between gap-2 rounded-md px-1 text-xs font-medium text-muted select-none'
+          : 'block min-w-0 space-y-1'
+      }
+    >
       <span
         onMouseDown={handleMouseDown}
         className={[
-          'inline-block px-1 text-xs font-medium text-muted select-none',
+          isInline ? 'shrink-0' : 'inline-block px-1',
+          'text-xs font-medium text-muted select-none',
           disabled
             ? 'cursor-not-allowed opacity-50'
             : isDragging
@@ -115,7 +128,11 @@ export function ScrubberInput({
           }
         }}
         disabled={disabled}
-        className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-right text-sm tabular-nums disabled:cursor-not-allowed disabled:opacity-50"
+        className={
+          isInline
+            ? 'w-16 rounded-md border border-border bg-background px-2 py-1.5 text-right text-sm tabular-nums disabled:cursor-not-allowed disabled:opacity-50'
+            : 'w-full rounded-md border border-border bg-background px-2 py-1.5 text-right text-sm tabular-nums disabled:cursor-not-allowed disabled:opacity-50'
+        }
         aria-label={ariaLabel}
       />
     </label>

@@ -1,4 +1,4 @@
-import { Download } from 'lucide-react'
+import { Download, Package } from 'lucide-react'
 import type { ExportFormat } from '@/shared/types'
 import {
   Select,
@@ -7,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { Slider } from '@/components/ui/slider'
+import { ScrubberInput } from '@/shared/components/ScrubberInput'
 
 type SingleExportControlsProps = {
   variant: 'single'
@@ -19,16 +19,20 @@ type SingleExportControlsProps = {
 type BatchExportControlsProps = {
   variant: 'batch'
   disabled?: boolean
+  exportCount: number
   outputFormat: ExportFormat
   jpegQuality: number
   onOutputFormatChange: (value: ExportFormat) => void
   onJpegQualityChange: (value: number) => void
-  onBatchExport: () => void | Promise<void>
+  onExport: () => void | Promise<void>
   progressMessage?: string | null
   progress?: { current: number; total: number } | null
 }
 
 type ExportControlsProps = SingleExportControlsProps | BatchExportControlsProps
+
+const actionButtonClassName =
+  'inline-flex items-center justify-center gap-2 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50'
 
 export function ExportControls(props: ExportControlsProps) {
   if (props.variant === 'single') {
@@ -37,12 +41,16 @@ export function ExportControls(props: ExportControlsProps) {
         type="button"
         disabled={props.disabled}
         onClick={() => void props.onDownload()}
-        className="rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        className={actionButtonClassName}
       >
+        <Download size={15} />
         {props.label ?? 'Download'}
       </button>
     )
   }
+
+  const exportLabel = props.exportCount === 1 ? 'Export image' : 'Export ZIP'
+  const ExportIcon = props.exportCount === 1 ? Download : Package
 
   return (
     <div className="space-y-3">
@@ -68,32 +76,28 @@ export function ExportControls(props: ExportControlsProps) {
         </label>
 
         {props.outputFormat === 'image/jpeg' ? (
-          <label className="block space-y-1">
-            <span className="text-xs font-medium text-muted">
-              Quality {Math.round(props.jpegQuality * 100)}%
-            </span>
-            <Slider
-              min={0.6}
-              max={1}
-              step={0.05}
-              value={[props.jpegQuality]}
-              onValueChange={(value) => {
-                const v = Array.isArray(value) ? value[0] : value
-                props.onJpegQualityChange(v)
-              }}
-            />
-          </label>
+          <ScrubberInput
+            label="Quality"
+            value={Math.round(props.jpegQuality * 100)}
+            min={60}
+            max={100}
+            step={5}
+            onChange={(percent) => props.onJpegQualityChange(percent / 100)}
+            ariaLabel="JPEG quality percent"
+            layout="inline"
+          />
         ) : null}
       </div>
 
       <button
         type="button"
         disabled={props.disabled}
-        onClick={() => void props.onBatchExport()}
-        className="flex w-full items-center justify-center gap-2 rounded-md bg-accent px-4 py-2.5 text-sm font-medium text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50"
+        onClick={() => void props.onExport()}
+        className={`${actionButtonClassName} w-full`}
+        aria-label={exportLabel}
       >
-        <Download size={15} />
-        Export ZIP
+        <ExportIcon size={16} />
+        {exportLabel}
       </button>
 
       {props.progress ? (

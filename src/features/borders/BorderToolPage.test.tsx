@@ -197,7 +197,7 @@ describe('BorderToolPage workspace', () => {
 
     expect(screen.getByTestId('inspect-filter')).toHaveTextContent('original')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Export ZIP' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Export image' }))
 
     await waitFor(() => {
       expect(renderProcessedCanvasMock).toHaveBeenCalled()
@@ -306,42 +306,34 @@ describe('BorderToolPage workspace', () => {
 
     render(<BorderToolPage />)
 
-    // Enter inspect mode, change first image's filter to ember, return to browse
     await userEvent.click(screen.getByRole('button', { name: 'Inspect image' }))
-    // The inspect workspace mock shows the filter - now change it via the filter select
-    // Since inspect uses the direct edit target, we can change the filter there
-    // Let's switch back to browse and select all
+    await userEvent.click(screen.getByRole('combobox', { name: 'Filter preset' }))
+    await userEvent.click(screen.getByRole('option', { name: 'Ember' }))
+
     const footer = screen.getByLabelText('Workspace footer')
     await userEvent.click(within(footer).getByRole('radio', { name: 'Browse' }))
-
-    // Select all images
     await userEvent.click(within(footer).getByRole('button', { name: 'Select all' }))
 
-    // The mock renders menu actions for the first image
-    // Click "Apply to selected" to copy first image's recipe to others
     const applyButton = screen.getByTestId('apply-to-selected')
     expect(applyButton).toHaveTextContent('Apply to selected')
     await userEvent.click(applyButton)
 
-    // All images should now have the same recipe (original filter from first image)
-    // The export should use the same filter for all
     await userEvent.click(screen.getByRole('button', { name: 'Export ZIP' }))
 
     await waitFor(() => {
       expect(renderProcessedCanvasMock).toHaveBeenCalled()
     })
 
-    // All calls should use the default recipe filter
     const calls = renderProcessedCanvasMock.mock.calls
     expect(calls).toHaveLength(3)
     for (const call of calls) {
       expect(call[0].filterAdjustments).toEqual({
-        brightness: 100,
-        contrast: 100,
-        saturation: 100,
+        brightness: 105,
+        contrast: 110,
+        saturation: 120,
         grayscale: 0,
-        sepia: 0,
-        hueRotate: 0,
+        sepia: 15,
+        hueRotate: -10,
       })
     }
   })
@@ -390,5 +382,33 @@ describe('BorderToolPage workspace', () => {
       sepia: 0,
       hueRotate: 0,
     })
+  })
+
+  it('exports a single ready item directly instead of creating a zip', async () => {
+    useImageQueueMock.mockReturnValue({
+      items: [
+        createItem('1', 'one.jpg'),
+        {
+          ...createItem('2', 'two.jpg'),
+          status: 'processing',
+        },
+      ],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+
+    expect(screen.getByRole('button', { name: 'Export image' })).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Export image' }))
+
+    await waitFor(() => {
+      expect(renderProcessedCanvasMock).toHaveBeenCalledTimes(1)
+    })
+
+    expect(exportZipMock).not.toHaveBeenCalled()
   })
 })

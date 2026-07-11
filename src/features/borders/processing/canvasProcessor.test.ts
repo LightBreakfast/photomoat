@@ -118,7 +118,7 @@ describe('calculateContainRect', () => {
     })
   })
 
-  it('reserves a fixed minimum border width when requested', () => {
+  it('preserves the requested horizontal padding when it fits', () => {
     expect(
       calculateImagePlacementRect({
         sourceWidth: 1600,
@@ -137,7 +137,26 @@ describe('calculateContainRect', () => {
     })
   })
 
-  it('clamps border width to the preset bounds', () => {
+  it('increases horizontal padding when preserving it exactly would overflow the height', () => {
+    expect(
+      calculateImagePlacementRect({
+        sourceWidth: 800,
+        sourceHeight: 1200,
+        targetWidth: 1080,
+        targetHeight: 1080,
+        sizingMode: 'border-width',
+        borderWidthPixels: 90,
+      }),
+    ).toEqual({
+      scale: 0.9,
+      drawWidth: 720,
+      drawHeight: 1080,
+      x: 180,
+      y: 0,
+    })
+  })
+
+  it('clamps horizontal padding to the preset bounds', () => {
     expect(
       calculateImagePlacementRect({
         sourceWidth: 1200,
