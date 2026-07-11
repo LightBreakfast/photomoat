@@ -274,9 +274,9 @@ Recommended file:
 - remove recipes when images are removed
 - resolve current recipe for an image id
 - apply patch to one image
-- apply patch to many images
+- apply patch to many images when needed
+- replace many images with a source recipe
 - reset image(s) to defaults later
-- derive shared/mixed values for current edit targets
 
 ### Suggested reducer actions
 
@@ -288,6 +288,11 @@ type ImageEditsAction =
   | { type: 'patch-image'; imageId: string; patch: Partial<ImageEditRecipe> }
   | { type: 'patch-images'; imageIds: string[]; patch: Partial<ImageEditRecipe> }
   | { type: 'replace-image-recipe'; imageId: string; recipe: ImageEditRecipe }
+  | {
+      type: 'replace-images-with-recipe'
+      imageIds: string[]
+      recipe: ImageEditRecipe
+    }
 ```
 
 ### Suggested hook API
@@ -300,9 +305,8 @@ const {
   removeImages,
   patchImage,
   patchImages,
+  replaceImagesWithRecipe,
   getRecipe,
-  getSharedValue,
-  hasMixedValue,
 } = useImageEdits()
 ```
 
@@ -315,7 +319,8 @@ const {
 Derive the current edit target from existing page state.
 
 ### Browse mode
-Target ids = selected ready-image ids.
+- if exactly 1 ready image is selected, that image is the direct edit target
+- if 2+ ready images are selected, use explicit batch apply actions instead of mixed-value direct editing in v1
 
 ### Inspect mode
 Target ids = current inspect image id, if ready.
@@ -331,45 +336,53 @@ type EditTarget = {
 
 ### Rules
 - Browse with no selection -> edit controls disabled
+- Browse with 1 selected image -> controls edit that image directly
+- Browse with 2+ selected images -> direct field controls are disabled in v1
 - Inspect with no active ready image -> edit controls disabled
-- changing a control applies that field to **all target ids**
+- Inspect with an active ready image -> controls edit the current image directly
+- batch changes across many images happen through explicit apply actions
 
-This is the cleanest mental model.
+This keeps the first version simple and avoids mixed-value complexity.
 
 ---
 
 ## Multi-Select UX Recommendation
 
-This is the main product decision area.
-
 ## Recommended v1 behavior
-When multiple selected images have different values:
-- controls show a **mixed** state where possible
-- changing a control applies the new value to all selected images
+Keep multi-select editing intentionally simple.
 
-### Examples
-- filter preset dropdown: show `Mixed`
-- size preset dropdown: show `Mixed`
-- background color hex field: show blank/placeholder + mixed helper text
-- sizing mode: show `Mixed`
-- numeric controls: show blank/placeholder or last common value only if equal
+When 2+ images are selected in Browse:
+- do **not** show mixed-value direct editing controls in v1
+- show helper copy like `3 images selected`
+- show an explicit batch action:
+  - `Apply current image edits to selected`
+- optionally also show:
+  - `Apply current image edits to all`
 
-## Why this is best practice
-This matches how batch editing usually behaves:
-- differing values are represented as mixed
-- the next explicit user change becomes a batch apply
+## Source of truth for batch apply
+The source recipe should be the **current image in Inspect**.
 
-## If mixed-state UI feels too expensive
-Fallback MVP option:
-- if multiple selected images differ, show a summary banner like `Mixed values across selection`
-- keep controls enabled
-- show the first target's value visually
-- the next user change still applies to all selected images
+That gives a clear workflow:
+1. open an image in Inspect
+2. tune its filter/size/border
+3. select other images in Browse
+4. apply the current image recipe to selected or all
 
-This is easier technically but more ambiguous.
+## Why this is a good v1
+- avoids mixed-state UI complexity
+- avoids ambiguous batch-editing behavior
+- matches common “copy edits / paste edits” workflows
+- keeps the architecture compatible with future mixed-state editing later
 
-### Recommendation
-Prefer real mixed-state support for select-like controls first.
+## Recommended follow-up naming
+Internally this should be treated as recipe copy/apply, for example:
+- `replaceImagesWithRecipe(imageIds, recipe)`
+
+Later you can evolve this into:
+- copy edits
+- paste edits
+- sync selected images
+- preset snapshots
 
 ---
 
@@ -438,10 +451,10 @@ This becomes the core new state layer.
 This will be the main orchestration refactor.
 
 ### New responsibilities
-- derive current edit targets
+- derive direct edit target vs batch-selection state
 - initialize per-image recipes when files are added
 - remove recipes when items are removed
-- compute shared/mixed control values for the target selection
+- resolve the current inspect source recipe for batch apply
 - pass per-image recipes to browse/inspect/export
 
 ### Important export change
@@ -497,31 +510,22 @@ Files:
 - `src/features/borders/components/BorderControls.tsx`
 
 ### Required change
-Support control values that may be:
+Support control states that may be:
 - concrete
-- mixed
 - disabled
 
 ### Recommended prop model
-For v1, do not over-generalize.
-A simple pattern is enough:
+Keep these components simple in v1.
+Use ordinary value props plus `disabled` and optional helper copy from the parent.
 
-```ts
-type MixedValueProp<T> = {
-  value: T
-  isMixed?: boolean
-  disabled?: boolean
-}
-```
-
-Or field-by-field props like:
+Example:
 - `selectedPresetId?: FilterPresetId`
-- `isMixed?: boolean`
 - `disabled?: boolean`
+- `helperText?: string`
 
 ### Important note
-Mixed numeric/color inputs are the fiddliest part.
-Plan to handle selects first, then text/numeric inputs carefully.
+Avoid introducing mixed-value control abstractions in this pass.
+The batch workflow should be handled with explicit apply actions instead.
 
 ---
 
@@ -569,24 +573,24 @@ The app can render and export different recipes per image.
 ---
 
 ## Phase 3: target-aware editing
-- derive edit targets from selection / inspect focus
-- disable controls when no valid target exists
-- wire filter/size/border changes to target ids only
+- derive direct edit target from single selection / inspect focus
+- disable controls when no valid direct target exists
+- wire filter/size/border changes to one selected image in Browse or current image in Inspect
 - keep export settings global
 
 ### Deliverable
-User can edit selected images in Browse and current image in Inspect.
+User can edit one selected image in Browse and the current image in Inspect.
 
 ---
 
-## Phase 4: mixed-state UX
-- detect differing values across selected targets
-- show mixed states in controls
-- apply next explicit change to all targets
-- add small helper copy like `Editing 3 selected images`
+## Phase 4: batch apply UX
+- add helper copy for multi-selection
+- add `Apply current image edits to selected`
+- optionally add `Apply current image edits to all`
+- ensure batch apply copies the full recipe snapshot
 
 ### Deliverable
-Batch editing feels intentional and understandable.
+Batch editing feels intentional without needing mixed-state controls.
 
 ---
 
@@ -605,25 +609,27 @@ Clean handoff-quality architecture.
 
 ### Browse with no selection
 Show helper text near controls:
-- `Select one or more images to edit.`
+- `Select an image to edit.`
 
-### Browse with selection
+### Browse with one selection
 Show helper text:
-- `Editing 3 selected images`
+- `Editing selected image`
+
+### Browse with multi-selection
+Show helper text:
+- `3 images selected`
+- `Direct editing is disabled for multi-select in this version`
+- `Apply current image edits to selected images`
 
 ### Inspect
 Show helper text:
 - `Editing current image`
 
-### Mixed values
-Show helper text where needed:
-- `Mixed values`
-
 This will reduce confusion a lot.
 
 ---
 
-## Confirmed Decisions / Remaining Question
+## Confirmed Decisions
 
 These decisions are now confirmed for implementation.
 
@@ -632,15 +638,9 @@ These decisions are now confirmed for implementation.
 - New imports: **inherit current default recipe snapshot**
 - Reset semantics: **reset to defaults**
 - Compare scope: **filter-only for this pass**
-
-## Remaining open question
-## 1. Mixed values UX
-When 2+ selected images have different values, should controls show:
-- a real `Mixed` state, or
-- the first selected image's value and silently batch-override on change?
-
-### Recommendation
-Use explicit mixed state.
+- Multi-select editing: **keep it simple**
+- Multi-select workflow: **edit one image, then apply that image's recipe to selected images**
+- Optional stretch action: **apply current image edits to all images**
 
 ---
 
@@ -651,9 +651,8 @@ Use explicit mixed state.
 - initializes recipes for new ids
 - patches one image
 - patches many images
+- replaces many images with one source recipe
 - removes image recipes cleanly
-- returns correct shared value when all targets match
-- detects mixed values when targets differ
 
 ### persistence hooks
 - default recipe loads/sanitizes from localStorage
@@ -663,17 +662,14 @@ Use explicit mixed state.
 
 ## Component tests
 ### `FilterControls`
-- disabled with no edit target
-- shows mixed state when requested
+- disabled with no direct edit target
 - applies selected filter change
 
 ### `PresetSelector`
-- shows mixed state when requested
 - custom size changes propagate correctly
 
 ### `BorderControls`
 - disabled when appropriate
-- mixed states render correctly where supported
 - changing one control applies one field patch
 
 ---
@@ -681,13 +677,15 @@ Use explicit mixed state.
 ## Integration tests
 ### `BorderToolPage`
 - new images get initialized recipes
-- selected browse edits affect only selected ids
+- single selected browse edits affect only that image
 - inspect edits affect only active image
-- unselected browse images keep their recipe
+- multi-selected browse images do not enable direct field editing
+- apply current image edits to selected copies the full recipe
+- apply current image edits to all copies the full recipe if implemented
+- unselected browse images keep their recipe unless batch apply is used
 - export ZIP uses each image's own recipe
 - removing an image cleans recipe state
 - controls disable when no browse selection exists
-- mixed selected images surface correct UI state
 
 ---
 
@@ -695,7 +693,7 @@ Use explicit mixed state.
 
 ## 1. Control-state complexity is the real cost
 Canvas work is not the hard part.
-Mixed-value UI is.
+That is why this plan avoids mixed-value UI in v1.
 
 ## 2. Do not keep “global current recipe” as the source of truth
 That will create confusing bugs and partial migrations.
@@ -722,10 +720,9 @@ This feature is a **good next step** and the current architecture is already clo
 - keep defaults persisted in localStorage
 - do **not** add BrowserDB yet
 - use a **feature-local reducer hook**
-- support batch editing through derived edit targets
+- support simple batch editing through **apply recipe from current image** actions
 
 ### Overall effort
 This is **moderate complexity**, not a rewrite.
 
-The biggest design decision is the **multi-select mixed-state UI**.
-Once that is settled, the implementation is very manageable.
+With mixed-state editing deferred, the implementation becomes much more straightforward.
