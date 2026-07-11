@@ -623,10 +623,17 @@ This will reduce confusion a lot.
 
 ---
 
-## Open Questions / Decisions Needed
+## Confirmed Decisions / Remaining Question
 
-These are the main product questions another model should confirm before building the final UI.
+These decisions are now confirmed for implementation.
 
+## Confirmed
+- Browse with no selection: **disable edit controls**
+- New imports: **inherit current default recipe snapshot**
+- Reset semantics: **reset to defaults**
+- Compare scope: **filter-only for this pass**
+
+## Remaining open question
 ## 1. Mixed values UX
 When 2+ selected images have different values, should controls show:
 - a real `Mixed` state, or
@@ -634,39 +641,6 @@ When 2+ selected images have different values, should controls show:
 
 ### Recommendation
 Use explicit mixed state.
-
-## 2. Reset semantics
-Do you want:
-- reset selected/current image(s) to app defaults, or
-- reset to original/no-border/original filter?
-
-### Recommendation
-Reset to **default recipe**.
-
-## 3. New import behavior
-When new images are added, should they:
-- inherit the current default recipe snapshot, or
-- always start from hardcoded defaults?
-
-### Recommendation
-Inherit the current default recipe snapshot.
-
-## 4. No-selection behavior in Browse
-Should controls be:
-- disabled, or
-- editable as “future defaults” even with no selection?
-
-### Recommendation
-Disable them for this feature.
-If future-default editing is desired later, make it an explicit separate action.
-
-## 5. Compare scope
-Should compare remain:
-- filter-only, matching current behavior, or
-- full recipe compare later?
-
-### Recommendation
-Keep compare **filter-only** for this pass to avoid scope creep.
 
 ---
 
