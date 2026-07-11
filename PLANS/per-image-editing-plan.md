@@ -726,3 +726,322 @@ This feature is a **good next step** and the current architecture is already clo
 This is **moderate complexity**, not a rewrite.
 
 With mixed-state editing deferred, the implementation becomes much more straightforward.
+
+---
+
+## Model-Ready Implementation Checklist
+
+Use this as the execution order for the implementation model.
+
+## Guardrails
+- keep image files/object URLs in `useImageQueue()`
+- do not introduce IndexedDB in this pass
+- do not keep a second global "current recipe" source of truth
+- do not implement mixed-value controls in this pass
+- keep compare behavior filter-only
+- keep export settings global
+
+## Step 0: baseline
+1. run `npm test`
+2. inspect current usages of `BorderSettings`
+3. confirm branch is `feature/per-image-editing-plan`
+
+## Step 1: split types
+Files:
+- `src/features/borders/types.ts`
+
+Tasks:
+- add `ImageEditRecipe`
+- add `ExportSettings`
+- keep `ImageSizingMode`, `FilterPresetId`, `FilterAdjustments`, `InspectZoom`
+- either remove `BorderSettings` or redefine it only temporarily during migration
+
+Recommended shape:
+```ts
+type ImageEditRecipe = {
+  presetId: OutputPresetId
+  backgroundColor: string
+  imageSizingMode: ImageSizingMode
+  imageEdgePixels: number
+  borderWidthPixels: number
+  customWidth: number
+  customHeight: number
+  filterPresetId: FilterPresetId
+}
+
+type ExportSettings = {
+  outputFormat: ExportFormat
+  jpegQuality: number
+}
+```
+
+Done when:
+- recipe fields are clearly separated from export fields
+
+## Step 2: split persistence hook
+Files:
+- `src/features/borders/useBorderSettings.ts`
+- optionally new files:
+  - `src/features/borders/useDefaultImageRecipe.ts`
+  - `src/features/borders/useExportSettings.ts`
+
+Tasks:
+- stop using one persisted object for both recipe and export settings
+- keep localStorage persistence only for:
+  - default image recipe
+  - export settings
+- preserve current sanitization behavior
+- preserve current defaults:
+  - preset/background/sizing/border/custom size/filter defaults
+  - output format / jpeg quality defaults
+
+Preferred outcome:
+- one hook for default recipe
+- one hook for export settings
+
+Acceptable fallback:
+- keep `useBorderSettings.ts` but have it return two nested domains:
+  - `defaultRecipe`
+  - `exportSettings`
+
+Done when:
+- `BorderToolPage` can read defaults separately from export settings
+- tests cover localStorage load/sanitize for the new shape
+
+## Step 3: add per-image edit state
+Files:
+- new: `src/features/borders/useImageEdits.ts`
+- new test: `src/features/borders/useImageEdits.test.tsx` or `.test.ts`
+
+Tasks:
+- implement reducer state keyed by image id
+- initialize image recipes from the current default recipe snapshot
+- support single-image patch
+- support many-image patch if useful
+- support `replaceImagesWithRecipe(imageIds, recipe)`
+- support removal cleanup
+- provide `getRecipe(imageId)` with safe fallback behavior
+
+Recommended reducer actions:
+```ts
+initialize-images
+remove-image
+remove-images
+patch-image
+patch-images
+replace-image-recipe
+replace-images-with-recipe
+```
+
+Done when:
+- hook tests prove initialization, patching, replacement, and cleanup work
+
+## Step 4: wire recipe lifecycle into `BorderToolPage`
+Files:
+- `src/features/borders/BorderToolPage.tsx`
+
+Tasks:
+- instantiate the new per-image edit hook
+- when new ready items appear, initialize recipes for missing ids
+- when items are removed, remove recipes
+- derive:
+  - `selectedReadyItems`
+  - `singleSelectedReadyItem`
+  - `activeInspectItem`
+  - `currentInspectRecipe`
+- derive whether controls should be enabled for:
+  - browse single-select
+  - inspect current image
+  - multi-select batch apply
+
+Important rule:
+- Browse direct editing is enabled only when exactly one ready image is selected
+- Inspect direct editing is enabled when there is an active ready image
+
+Done when:
+- no editing control depends on one global image recipe anymore
+
+## Step 5: convert direct edit handlers
+Files:
+- `src/features/borders/BorderToolPage.tsx`
+
+Tasks:
+- replace `setPresetId`, `setBackgroundColor`, `setImageSizingMode`, etc. usage for image edits with recipe patch handlers
+- direct edits should patch:
+  - selected image in Browse when exactly one is selected
+  - active image in Inspect
+- export controls should still use global export settings setters
+
+Implementation hint:
+- create a helper like `patchDirectTarget(patch)` inside `BorderToolPage`
+- no-op when there is no valid direct target
+
+Done when:
+- changing filter/border/size no longer updates every image globally
+
+## Step 6: render per-image previews in Browse
+Files:
+- `src/features/borders/components/BrowseWorkspace.tsx`
+- `src/shared/components/ImageGrid.tsx`
+- `src/shared/components/ImageCard.tsx`
+- maybe `src/shared/components/PreviewCanvas.tsx`
+
+Tasks:
+- stop passing one shared recipe-derived prop set to all cards
+- pass either:
+  - `getItemRecipe(id)`
+  - or pre-resolved per-item render props
+- for each image card, resolve:
+  - preset from that image's recipe
+  - filter adjustments from that image's `filterPresetId`
+  - compare override to original filter only
+
+Important rule:
+- compare should still only affect filters, not border/background/size
+
+Done when:
+- two images with different recipes render differently in the grid
+
+## Step 7: render active recipe in Inspect
+Files:
+- `src/features/borders/components/InspectWorkspace.tsx`
+- `src/features/borders/BorderToolPage.tsx`
+
+Tasks:
+- pass the active image recipe into Inspect
+- resolve preset/filter adjustments from that recipe
+- keep compare behavior filter-only
+
+Done when:
+- Inspect always reflects the current image's own recipe
+
+## Step 8: update export to use item recipe
+Files:
+- `src/features/borders/BorderToolPage.tsx`
+
+Tasks:
+- change `createProcessedBlob(item)` to resolve recipe by `item.id`
+- derive preset per item
+- derive filter adjustments per item
+- keep filename/output format/jpeg quality logic global
+- ensure ZIP export uses each image's own recipe
+
+Done when:
+- export output matches visible per-image previews
+
+## Step 9: simplify controls for v1 behavior
+Files:
+- `src/features/borders/components/FilterControls.tsx`
+- `src/features/borders/components/PresetSelector.tsx`
+- `src/features/borders/components/BorderControls.tsx`
+- `src/features/borders/BorderToolPage.tsx`
+
+Tasks:
+- add `disabled` support wherever needed
+- optionally add `helperText` from parent if useful
+- do not implement mixed-value UI
+- Browse UI behavior:
+  - 0 selected -> controls disabled
+  - 1 selected -> controls enabled
+  - 2+ selected -> controls disabled for direct editing
+- Inspect UI behavior:
+  - active ready image -> controls enabled
+
+Done when:
+- the control state matches the confirmed product rules
+
+## Step 10: add batch apply actions
+Files:
+- `src/features/borders/BorderToolPage.tsx`
+- possibly `src/features/borders/components/BrowseWorkspace.tsx`
+- possibly a footer/toolbar component if that is the cleanest place
+
+Tasks:
+- add action: `Apply current image edits to selected`
+- optional stretch: `Apply current image edits to all`
+- source recipe is the active Inspect image recipe
+- disable batch apply when:
+  - there is no active inspect recipe
+  - there are fewer than 2 selected target images for the selected action
+- copying should replace the full recipe snapshot on targets
+
+Recommended guard:
+- exclude the source image id from targets if already selected, unless explicit product behavior says keep it included harmlessly
+
+Done when:
+- user can tune one image, then copy its edits across other images intentionally
+
+## Step 11: update helper copy / status text
+Files:
+- `src/features/borders/BorderToolPage.tsx`
+- any workspace subcomponents where text is shown
+
+Tasks:
+- no selection: `Select an image to edit.`
+- single selection: `Editing selected image`
+- multi-selection: `3 images selected`
+- multi-selection helper: `Direct editing is disabled for multi-select in this version`
+- batch apply helper: `Apply current image edits to selected images`
+
+Done when:
+- state changes are understandable without guessing
+
+## Step 12: tests
+Files likely affected:
+- `src/features/borders/BorderToolPage.test.tsx`
+- `src/features/borders/components/FilterControls.test.tsx`
+- `src/features/borders/components/PresetSelector.test.tsx`
+- `src/features/borders/components/BorderControls.test.tsx`
+- `src/shared/components/ImageGrid.test.tsx`
+- new `src/features/borders/useImageEdits.test.tsx`
+- updated persistence hook tests
+
+Must-cover scenarios:
+- new images get initialized recipes from defaults
+- single selected browse edits affect only one image
+- inspect edits affect only active image
+- multi-select disables direct controls
+- apply current image edits to selected copies full recipe
+- apply current image edits to all copies full recipe if implemented
+- unselected images keep their own recipes until batch apply
+- removing an image cleans recipe state
+- export ZIP uses per-image settings
+- compare remains filter-only
+
+## Step 13: verification pass
+1. run `npm test`
+2. manually verify:
+   - import 3+ images
+   - edit one image in Inspect
+   - return to Browse and confirm only that image changed
+   - single-select another image and edit it independently
+   - multi-select and confirm direct controls are disabled
+   - apply current image edits to selected and verify copied result
+   - export PNG/JPEG and confirm outputs match previews
+3. check for dead code from the old global recipe path
+
+## Suggested implementation order inside the branch
+1. types
+2. persistence split
+3. `useImageEdits`
+4. `BorderToolPage` state wiring
+5. inspect rendering
+6. browse rendering
+7. export path
+8. control disabling rules
+9. batch apply action
+10. tests and cleanup
+
+## Handoff note for the implementation model
+The core architectural goal is:
+- every image has its own full recipe snapshot
+- direct editing only targets one image at a time
+- multi-select uses explicit recipe copy/apply, not mixed controls
+- export resolves recipe per image
+
+If forced to choose, prioritize correctness in:
+1. per-image preview rendering
+2. per-image export rendering
+3. recipe lifecycle cleanup
+4. batch apply behavior
+5. UI polish
