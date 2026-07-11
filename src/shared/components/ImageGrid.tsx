@@ -60,6 +60,7 @@ export function ImageGrid({
             sizingMode={recipe.imageSizingMode}
             edgePixels={recipe.imageEdgePixels}
             borderWidthPixels={recipe.borderWidthPixels}
+            minVerticalPaddingPixels={recipe.minVerticalPaddingPixels}
             filterAdjustments={filterAdjustments}
             isDownloading={activeDownloadId === item.id}
             isSelected={selectedIds?.has(item.id)}

@@ -10,6 +10,7 @@ const defaultRecipe: ImageEditRecipe = {
   imageSizingMode: 'contain',
   imageEdgePixels: 900,
   borderWidthPixels: 90,
+  minVerticalPaddingPixels: 90,
   customWidth: 1080,
   customHeight: 1080,
   filterPresetId: 'original',

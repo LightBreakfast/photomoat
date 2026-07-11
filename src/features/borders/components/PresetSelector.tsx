@@ -165,6 +165,7 @@ export function PresetSelector({
             <div className="grid grid-cols-2 gap-3">
               <ScrubberInput
                 label="Width"
+                scrubLabel="Pixels"
                 value={customWidth}
                 min={customSizeMin}
                 max={customSizeMax}
@@ -174,6 +175,7 @@ export function PresetSelector({
               />
               <ScrubberInput
                 label="Height"
+                scrubLabel="Pixels"
                 value={customHeight}
                 min={customSizeMin}
                 max={customSizeMax}

@@ -24,6 +24,7 @@ type ImageCardProps = {
   sizingMode: ImageSizingMode
   edgePixels: number
   borderWidthPixels: number
+  minVerticalPaddingPixels: number
   filterAdjustments?: FilterAdjustments
   isDownloading?: boolean
   isSelected?: boolean
@@ -41,6 +42,7 @@ export function ImageCard({
   sizingMode,
   edgePixels,
   borderWidthPixels,
+  minVerticalPaddingPixels,
   filterAdjustments,
   isDownloading = false,
   isSelected = false,
@@ -88,6 +90,7 @@ export function ImageCard({
                 sizingMode={sizingMode}
                 edgePixels={edgePixels}
                 borderWidthPixels={borderWidthPixels}
+                minVerticalPaddingPixels={minVerticalPaddingPixels}
                 filterAdjustments={filterAdjustments}
                 label={`Preview for ${item.filename}`}
               />

@@ -14,10 +14,12 @@ describe('BorderControls', () => {
         imageSizingMode="contain"
         imageEdgePixels={900}
         borderWidthPixels={90}
+        minVerticalPaddingPixels={90}
         onBackgroundColorChange={onBackgroundColorChange}
         onImageSizingModeChange={vi.fn()}
         onImageEdgePixelsChange={vi.fn()}
         onBorderWidthPixelsChange={vi.fn()}
+        onMinVerticalPaddingPixelsChange={vi.fn()}
       />,
     )
 
@@ -38,10 +40,12 @@ describe('BorderControls', () => {
         imageSizingMode="contain"
         imageEdgePixels={900}
         borderWidthPixels={90}
+        minVerticalPaddingPixels={90}
         onBackgroundColorChange={vi.fn()}
         onImageSizingModeChange={onImageSizingModeChange}
         onImageEdgePixelsChange={vi.fn()}
         onBorderWidthPixelsChange={vi.fn()}
+        onMinVerticalPaddingPixelsChange={vi.fn()}
       />,
     )
 
@@ -60,10 +64,12 @@ describe('BorderControls', () => {
         imageSizingMode="long-edge"
         imageEdgePixels={900}
         borderWidthPixels={90}
+        minVerticalPaddingPixels={90}
         onBackgroundColorChange={vi.fn()}
         onImageSizingModeChange={vi.fn()}
         onImageEdgePixelsChange={onImageEdgePixelsChange}
         onBorderWidthPixelsChange={vi.fn()}
+        onMinVerticalPaddingPixelsChange={vi.fn()}
       />,
     )
 
@@ -83,10 +89,12 @@ describe('BorderControls', () => {
         imageSizingMode="border-width"
         imageEdgePixels={900}
         borderWidthPixels={90}
+        minVerticalPaddingPixels={90}
         onBackgroundColorChange={vi.fn()}
         onImageSizingModeChange={vi.fn()}
         onImageEdgePixelsChange={vi.fn()}
         onBorderWidthPixelsChange={onBorderWidthPixelsChange}
+        onMinVerticalPaddingPixelsChange={vi.fn()}
       />,
     )
 
@@ -104,10 +112,12 @@ describe('BorderControls', () => {
         imageSizingMode="contain"
         imageEdgePixels={900}
         borderWidthPixels={90}
+        minVerticalPaddingPixels={90}
         onBackgroundColorChange={vi.fn()}
         onImageSizingModeChange={vi.fn()}
         onImageEdgePixelsChange={vi.fn()}
         onBorderWidthPixelsChange={vi.fn()}
+        onMinVerticalPaddingPixelsChange={vi.fn()}
       />,
     )
 
@@ -123,15 +133,68 @@ describe('BorderControls', () => {
         imageSizingMode="fill"
         imageEdgePixels={900}
         borderWidthPixels={90}
+        minVerticalPaddingPixels={90}
         onBackgroundColorChange={vi.fn()}
         onImageSizingModeChange={vi.fn()}
         onImageEdgePixelsChange={vi.fn()}
         onBorderWidthPixelsChange={vi.fn()}
+        onMinVerticalPaddingPixelsChange={vi.fn()}
       />,
     )
 
     expect(screen.queryByLabelText(/target edge size in pixels/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/horizontal padding in pixels/i)).not.toBeInTheDocument()
     expect(screen.getByLabelText(/image sizing mode/i)).toBeInTheDocument()
+  })
+
+  it('renders sides and vertical min inputs when fixed-sides mode is active', () => {
+    const onBorderWidthPixelsChange = vi.fn()
+    const onMinVerticalPaddingPixelsChange = vi.fn()
+
+    render(
+      <BorderControls
+        backgroundColor="#ffffff"
+        imageSizingMode="fixed-sides"
+        imageEdgePixels={900}
+        borderWidthPixels={90}
+        minVerticalPaddingPixels={60}
+        onBackgroundColorChange={vi.fn()}
+        onImageSizingModeChange={vi.fn()}
+        onImageEdgePixelsChange={vi.fn()}
+        onBorderWidthPixelsChange={onBorderWidthPixelsChange}
+        onMinVerticalPaddingPixelsChange={onMinVerticalPaddingPixelsChange}
+      />,
+    )
+
+    expect(screen.getByLabelText(/horizontal padding in pixels/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/minimum vertical padding in pixels/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/horizontal padding in pixels/i)).toHaveValue('90')
+    expect(screen.getByLabelText(/minimum vertical padding in pixels/i)).toHaveValue('60')
+  })
+
+  it('propagates vertical padding changes when fixed-sides mode is active', () => {
+    const onMinVerticalPaddingPixelsChange = vi.fn()
+
+    render(
+      <BorderControls
+        backgroundColor="#ffffff"
+        imageSizingMode="fixed-sides"
+        imageEdgePixels={900}
+        borderWidthPixels={90}
+        minVerticalPaddingPixels={60}
+        onBackgroundColorChange={vi.fn()}
+        onImageSizingModeChange={vi.fn()}
+        onImageEdgePixelsChange={vi.fn()}
+        onBorderWidthPixelsChange={vi.fn()}
+        onMinVerticalPaddingPixelsChange={onMinVerticalPaddingPixelsChange}
+      />,
+    )
+
+    fireEvent.change(screen.getByLabelText(/minimum vertical padding in pixels/i), {
+      target: { value: '48' },
+    })
+    fireEvent.blur(screen.getByLabelText(/minimum vertical padding in pixels/i))
+
+    expect(onMinVerticalPaddingPixelsChange).toHaveBeenCalledWith(48)
   })
 })

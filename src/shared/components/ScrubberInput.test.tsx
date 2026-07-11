@@ -189,4 +189,56 @@ describe('ScrubberInput', () => {
     expect(screen.getByText('Width (px)')).toBeInTheDocument()
     expect(screen.getByLabelText('Width in pixels')).toBeDisabled()
   })
+
+  it('keeps the field label visible and shows scrubLabel separately in stacked layout', () => {
+    render(
+      <ScrubberInput
+        label="Width"
+        scrubLabel="Pixels"
+        value={1080}
+        onChange={vi.fn()}
+        ariaLabel="Width in pixels"
+      />,
+    )
+
+    expect(screen.getByText('Width')).toBeInTheDocument()
+    expect(screen.getByText('Pixels')).toBeInTheDocument()
+    expect(screen.getByLabelText('Width in pixels')).toBeInTheDocument()
+  })
+
+  it('uses scrubLabel as the drag handle when provided', () => {
+    const onChange = vi.fn()
+
+    render(
+      <ScrubberInput
+        label="Width"
+        scrubLabel="Pixels"
+        value={1080}
+        step={1}
+        onChange={onChange}
+        ariaLabel="Width in pixels"
+      />,
+    )
+
+    const scrubHandle = screen.getByText('Pixels')
+    fireEvent.mouseDown(scrubHandle, { clientX: 100 })
+    fireEvent.mouseMove(document, { clientX: 150 })
+
+    expect(onChange).toHaveBeenCalledWith(1130)
+
+    fireEvent.mouseUp(document)
+  })
+
+  it('falls back to label when scrubLabel is not provided', () => {
+    render(
+      <ScrubberInput
+        label="Width"
+        value={1080}
+        onChange={vi.fn()}
+        ariaLabel="Width in pixels"
+      />,
+    )
+
+    expect(screen.getByText('Width')).toBeInTheDocument()
+  })
 })

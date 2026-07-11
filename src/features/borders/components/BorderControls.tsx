@@ -17,10 +17,12 @@ type BorderControlsProps = {
   imageSizingMode: ImageSizingMode
   imageEdgePixels: number
   borderWidthPixels: number
+  minVerticalPaddingPixels: number
   onBackgroundColorChange: (color: string) => void
   onImageSizingModeChange: (mode: ImageSizingMode) => void
   onImageEdgePixelsChange: (pixels: number) => void
   onBorderWidthPixelsChange: (pixels: number) => void
+  onMinVerticalPaddingPixelsChange: (pixels: number) => void
   disabled?: boolean
 }
 
@@ -28,15 +30,21 @@ function isEdgeSizingMode(mode: ImageSizingMode) {
   return mode === 'long-edge' || mode === 'short-edge'
 }
 
+function isSidePaddingMode(mode: ImageSizingMode) {
+  return mode === 'border-width' || mode === 'fixed-sides'
+}
+
 export function BorderControls({
   backgroundColor,
   imageSizingMode,
   imageEdgePixels,
   borderWidthPixels,
+  minVerticalPaddingPixels,
   onBackgroundColorChange,
   onImageSizingModeChange,
   onImageEdgePixelsChange,
   onBorderWidthPixelsChange,
+  onMinVerticalPaddingPixelsChange,
   disabled = false,
 }: BorderControlsProps) {
   return (
@@ -100,6 +108,7 @@ export function BorderControls({
                     'long-edge': 'Long edge',
                     'short-edge': 'Short edge',
                     'border-width': 'Side padding',
+                    'fixed-sides': 'Fixed sides',
                     fill: 'Fill (no border)',
                   }
                   return labels[value] ?? value
@@ -111,6 +120,7 @@ export function BorderControls({
               <SelectItem value="long-edge">Long edge</SelectItem>
               <SelectItem value="short-edge">Short edge</SelectItem>
               <SelectItem value="border-width">Side padding</SelectItem>
+              <SelectItem value="fixed-sides">Fixed sides</SelectItem>
               <SelectItem value="fill">Fill (no border)</SelectItem>
             </SelectContent>
           </Select>
@@ -119,6 +129,7 @@ export function BorderControls({
         {isEdgeSizingMode(imageSizingMode) ? (
           <ScrubberInput
             label="Edge"
+            scrubLabel="Pixels"
             value={imageEdgePixels}
             disabled={disabled}
             onChange={onImageEdgePixelsChange}
@@ -127,9 +138,22 @@ export function BorderControls({
           />
         ) : null}
 
-        {imageSizingMode === 'border-width' ? (
+        {imageSizingMode === 'fixed-sides' ? (
+          <ScrubberInput
+            label="Vertical min"
+            scrubLabel="Height (px)"
+            value={minVerticalPaddingPixels}
+            disabled={disabled}
+            onChange={onMinVerticalPaddingPixelsChange}
+            ariaLabel="Minimum vertical padding in pixels"
+            layout="inline"
+          />
+        ) : null}
+
+        {isSidePaddingMode(imageSizingMode) ? (
           <ScrubberInput
             label="Sides"
+            scrubLabel={imageSizingMode === 'fixed-sides' ? 'Width (px)' : 'Pixels'}
             value={borderWidthPixels}
             disabled={disabled}
             onChange={onBorderWidthPixelsChange}

@@ -39,6 +39,7 @@ function renderWorkspace(
       sizingMode="contain"
       edgePixels={900}
       borderWidthPixels={90}
+      minVerticalPaddingPixels={90}
       inspectZoom={{ mode: 'fit' }}
       {...overrides}
     />,

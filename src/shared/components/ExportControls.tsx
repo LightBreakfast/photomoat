@@ -78,6 +78,7 @@ export function ExportControls(props: ExportControlsProps) {
         {props.outputFormat === 'image/jpeg' ? (
           <ScrubberInput
             label="Quality"
+            scrubLabel="Quality"
             value={Math.round(props.jpegQuality * 100)}
             min={60}
             max={100}
