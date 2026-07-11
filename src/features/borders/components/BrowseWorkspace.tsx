@@ -1,15 +1,13 @@
-import type { FilterAdjustments, ImageSizingMode } from '@/features/borders/types'
-import type { ImageQueueItem, OutputPreset } from '@/shared/types'
+import type { FilterAdjustments, ImageEditRecipe } from '@/features/borders/types'
+import type { CardMenuAction } from '@/shared/components/ImageCard'
+import type { ImageQueueItem } from '@/shared/types'
 import { ImageGrid } from '@/shared/components/ImageGrid'
 
 type BrowseWorkspaceProps = {
   items: ImageQueueItem[]
-  preset: OutputPreset
-  backgroundColor: string
-  sizingMode: ImageSizingMode
-  edgePixels: number
-  borderWidthPixels: number
-  filterAdjustments?: FilterAdjustments
+  getItemRecipe: (id: string) => ImageEditRecipe
+  getItemFilterAdjustments: (id: string) => FilterAdjustments
+  getItemMenuActions?: (id: string) => CardMenuAction[]
   columns?: number
   activeDownloadId?: string | null
   selectedIds?: Set<string>
@@ -21,12 +19,9 @@ type BrowseWorkspaceProps = {
 
 export function BrowseWorkspace({
   items,
-  preset,
-  backgroundColor,
-  sizingMode,
-  edgePixels,
-  borderWidthPixels,
-  filterAdjustments,
+  getItemRecipe,
+  getItemFilterAdjustments,
+  getItemMenuActions,
   columns = 3,
   activeDownloadId,
   selectedIds,
@@ -38,12 +33,9 @@ export function BrowseWorkspace({
   return (
     <ImageGrid
       items={items}
-      preset={preset}
-      backgroundColor={backgroundColor}
-      sizingMode={sizingMode}
-      edgePixels={edgePixels}
-      borderWidthPixels={borderWidthPixels}
-      filterAdjustments={filterAdjustments}
+      getItemRecipe={getItemRecipe}
+      getItemFilterAdjustments={getItemFilterAdjustments}
+      getItemMenuActions={getItemMenuActions}
       columns={columns}
       activeDownloadId={activeDownloadId}
       selectedIds={selectedIds}

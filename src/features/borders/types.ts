@@ -21,11 +21,9 @@ export type InspectZoom =
   | { mode: 'fit' }
   | { mode: 'percent'; percent: (typeof inspectZoomPercents)[number] }
 
-export type BorderSettings = {
+export type ImageEditRecipe = {
   presetId: OutputPresetId
   backgroundColor: string
-  outputFormat: ExportFormat
-  jpegQuality: number
   imageSizingMode: ImageSizingMode
   imageEdgePixels: number
   borderWidthPixels: number
@@ -33,3 +31,11 @@ export type BorderSettings = {
   customHeight: number
   filterPresetId: FilterPresetId
 }
+
+export type ExportSettings = {
+  outputFormat: ExportFormat
+  jpegQuality: number
+}
+
+/** @deprecated Use ImageEditRecipe + ExportSettings instead. */
+export type BorderSettings = ImageEditRecipe & ExportSettings

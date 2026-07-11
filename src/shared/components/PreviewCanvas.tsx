@@ -151,7 +151,7 @@ export function PreviewCanvas({
           ? typeof zoomPercent === 'number'
             ? 'block shrink-0 bg-surface-muted'
             : 'max-h-full max-w-full bg-surface-muted object-contain'
-          : 'w-full bg-surface-muted'
+          : 'h-full w-full bg-surface-muted object-contain'
       }
       style={
         fullSize && typeof zoomPercent === 'number' && fullSizeDimensions

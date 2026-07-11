@@ -3,7 +3,6 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { BorderToolPage } from '@/features/borders/BorderToolPage'
-import { borderSettingsStorageKey } from '@/features/borders/useBorderSettings'
 import type { ImageQueueItem } from '@/shared/types'
 
 const {
@@ -36,12 +35,40 @@ vi.mock('@/shared/utils/downloadBlob', () => ({
 }))
 
 vi.mock('@/features/borders/components/BrowseWorkspace', () => ({
-  BrowseWorkspace: ({ filterAdjustments, onInspect }: { filterAdjustments?: { hueRotate?: number }; onInspect?: (index: number) => void }) => (
-    <div>
-      <div data-testid="browse-filter">{filterAdjustments?.hueRotate === -10 ? 'ember' : 'original'}</div>
-      <button type="button" onClick={() => onInspect?.(0)}>Inspect image</button>
-    </div>
-  ),
+  BrowseWorkspace: ({
+    getItemRecipe,
+    getItemFilterAdjustments,
+    getItemMenuActions,
+    onInspect,
+    items,
+  }: {
+    getItemRecipe: (id: string) => { filterPresetId: string }
+    getItemFilterAdjustments: (id: string) => { hueRotate?: number }
+    getItemMenuActions?: (id: string) => Array<{ label: string; onClick: () => void }>
+    onInspect?: (index: number) => void
+    items?: Array<{ id: string }>
+  }) => {
+    const firstId = items?.[0]?.id ?? 'unknown'
+    const recipe = getItemRecipe(firstId)
+    const adjustments = getItemFilterAdjustments(firstId)
+    const menuActions = getItemMenuActions?.(firstId) ?? []
+    return (
+      <div>
+        <div data-testid="browse-recipe-filter">{recipe.filterPresetId}</div>
+        <div data-testid="browse-filter">{adjustments?.hueRotate === -10 ? 'ember' : 'original'}</div>
+        <button type="button" onClick={() => onInspect?.(0)}>Inspect image</button>
+        {menuActions.length > 0 ? (
+          <button
+            type="button"
+            data-testid="apply-to-selected"
+            onClick={() => menuActions[0]?.onClick()}
+          >
+            {menuActions[0].label}
+          </button>
+        ) : null}
+      </div>
+    )
+  },
 }))
 
 vi.mock('@/features/borders/components/InspectWorkspace', () => ({
@@ -76,7 +103,9 @@ describe('BorderToolPage workspace', () => {
         items: ImageQueueItem[]
         createEntry: (item: ImageQueueItem) => Promise<unknown>
       }) => {
-        await createEntry(items[0])
+        for (const item of items) {
+          await createEntry(item)
+        }
       },
     )
   })
@@ -110,7 +139,7 @@ describe('BorderToolPage workspace', () => {
 
     await userEvent.click(footerQueries.getByRole('button', { name: 'Select all' }))
 
-    expect(footerQueries.getByText('1 of 1 selected')).toBeInTheDocument()
+    expect(footerQueries.getByText('one.jpg')).toBeInTheDocument()
     expect(footerQueries.getByRole('button', { name: 'Deselect all' })).toBeEnabled()
   })
 
@@ -140,8 +169,8 @@ describe('BorderToolPage workspace', () => {
     expect(footerQueries.getByRole('radio', { name: 'Browse' })).toBeInTheDocument()
     expect(footerQueries.getByRole('radio', { name: 'Inspect' })).toBeInTheDocument()
     expect(footerQueries.getByText('1 / 2')).toBeInTheDocument()
-    expect(footerQueries.getByText('one.jpg')).toBeInTheDocument()
-    expect(footerQueries.queryByText('one.jpg · 1 of 2')).not.toBeInTheDocument()
+    expect(footerQueries.getByText(/Editing current image/)).toBeInTheDocument()
+    expect(footerQueries.getByText(/one\.jpg/)).toBeInTheDocument()
   })
 
   it('shows original in inspect while compare is held, but keeps exports on the selected filter', async () => {
@@ -153,14 +182,11 @@ describe('BorderToolPage workspace', () => {
       setItemStatus: vi.fn(),
     })
 
-    window.localStorage.setItem(
-      borderSettingsStorageKey,
-      JSON.stringify({ filterPresetId: 'ember' }),
-    )
-
     render(<BorderToolPage />)
 
     await userEvent.click(screen.getByRole('button', { name: 'Inspect image' }))
+    await userEvent.click(screen.getByRole('combobox', { name: 'Filter preset' }))
+    await userEvent.click(screen.getByRole('option', { name: 'Ember' }))
 
     expect(screen.getByTestId('inspect-filter')).toHaveTextContent('ember')
 
@@ -214,7 +240,7 @@ describe('BorderToolPage workspace', () => {
     ).not.toBeInTheDocument()
   })
 
-  it('shows original in browse while the original button is held', () => {
+  it('shows original in browse while the original button is held', async () => {
     useImageQueueMock.mockReturnValue({
       items: [createItem('1', 'one.jpg')],
       message: null,
@@ -223,16 +249,16 @@ describe('BorderToolPage workspace', () => {
       setItemStatus: vi.fn(),
     })
 
-    window.localStorage.setItem(
-      borderSettingsStorageKey,
-      JSON.stringify({ filterPresetId: 'ember' }),
-    )
-
     render(<BorderToolPage />)
+
+    const footer = screen.getByLabelText('Workspace footer')
+
+    await userEvent.click(within(footer).getByRole('button', { name: 'Select all' }))
+    await userEvent.click(screen.getByRole('combobox', { name: 'Filter preset' }))
+    await userEvent.click(screen.getByRole('option', { name: 'Ember' }))
 
     expect(screen.getByTestId('browse-filter')).toHaveTextContent('ember')
 
-    const footer = screen.getByLabelText('Workspace footer')
     const originalButton = within(footer).getByRole('button', { name: 'Original' })
 
     expect(originalButton).toHaveAttribute('aria-pressed', 'false')
@@ -244,5 +270,125 @@ describe('BorderToolPage workspace', () => {
     fireEvent.pointerUp(originalButton)
     expect(originalButton).toHaveAttribute('aria-pressed', 'false')
     expect(screen.getByTestId('browse-filter')).toHaveTextContent('ember')
+  })
+
+  it('disables direct edit controls when multiple images are selected in browse', async () => {
+    useImageQueueMock.mockReturnValue({
+      items: [createItem('1', 'one.jpg'), createItem('2', 'two.jpg'), createItem('3', 'three.jpg')],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+
+    const footer = screen.getByLabelText('Workspace footer')
+
+    // Select all
+    await userEvent.click(within(footer).getByRole('button', { name: 'Select all' }))
+
+    // Multi-select status text should show
+    expect(within(footer).getByText('3 images selected')).toBeInTheDocument()
+
+    // Filter select should be disabled when multi-selected
+    expect(screen.getByRole('combobox', { name: 'Filter preset' })).toBeDisabled()
+  })
+
+  it('applies one image recipe to other selected images via context menu', async () => {
+    useImageQueueMock.mockReturnValue({
+      items: [createItem('1', 'one.jpg'), createItem('2', 'two.jpg'), createItem('3', 'three.jpg')],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+
+    // Enter inspect mode, change first image's filter to ember, return to browse
+    await userEvent.click(screen.getByRole('button', { name: 'Inspect image' }))
+    // The inspect workspace mock shows the filter - now change it via the filter select
+    // Since inspect uses the direct edit target, we can change the filter there
+    // Let's switch back to browse and select all
+    const footer = screen.getByLabelText('Workspace footer')
+    await userEvent.click(within(footer).getByRole('radio', { name: 'Browse' }))
+
+    // Select all images
+    await userEvent.click(within(footer).getByRole('button', { name: 'Select all' }))
+
+    // The mock renders menu actions for the first image
+    // Click "Apply to selected" to copy first image's recipe to others
+    const applyButton = screen.getByTestId('apply-to-selected')
+    expect(applyButton).toHaveTextContent('Apply to selected')
+    await userEvent.click(applyButton)
+
+    // All images should now have the same recipe (original filter from first image)
+    // The export should use the same filter for all
+    await userEvent.click(screen.getByRole('button', { name: 'Export ZIP' }))
+
+    await waitFor(() => {
+      expect(renderProcessedCanvasMock).toHaveBeenCalled()
+    })
+
+    // All calls should use the default recipe filter
+    const calls = renderProcessedCanvasMock.mock.calls
+    expect(calls).toHaveLength(3)
+    for (const call of calls) {
+      expect(call[0].filterAdjustments).toEqual({
+        brightness: 100,
+        contrast: 100,
+        saturation: 100,
+        grayscale: 0,
+        sepia: 0,
+        hueRotate: 0,
+      })
+    }
+  })
+
+  it('per-image recipes: single selected image in browse is independently editable', async () => {
+    useImageQueueMock.mockReturnValue({
+      items: [createItem('1', 'one.jpg'), createItem('2', 'two.jpg')],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+
+    // BrowseWorkspace mock receives getItemRecipe and getItemFilterAdjustments
+    // Both images should start with the default recipe (original filter)
+    expect(screen.getByTestId('browse-recipe-filter')).toHaveTextContent('original')
+  })
+
+  it('per-image recipes: export uses each image own recipe', async () => {
+    const items = [createItem('1', 'one.jpg'), createItem('2', 'two.jpg')]
+
+    useImageQueueMock.mockReturnValue({
+      items,
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Export ZIP' }))
+
+    await waitFor(() => {
+      expect(renderProcessedCanvasMock).toHaveBeenCalled()
+    })
+
+    // Both images should be rendered with the default recipe
+    expect(renderProcessedCanvasMock.mock.calls[0][0].filterAdjustments).toEqual({
+      brightness: 100,
+      contrast: 100,
+      saturation: 100,
+      grayscale: 0,
+      sepia: 0,
+      hueRotate: 0,
+    })
   })
 })

@@ -97,7 +97,7 @@ describe('BorderControls', () => {
     expect(onBorderWidthPixelsChange).toHaveBeenCalledWith(72)
   })
 
-  it('hides edge input when mode is contain', () => {
+  it('disables edge and border inputs when mode is contain', () => {
     render(
       <BorderControls
         backgroundColor="#ffffff"
@@ -111,11 +111,11 @@ describe('BorderControls', () => {
       />,
     )
 
-    expect(screen.queryByLabelText(/target edge size in pixels/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/border width in pixels/i)).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/target edge size in pixels/i)).toBeDisabled()
+    expect(screen.getByLabelText(/border width in pixels/i)).toBeDisabled()
   })
 
-  it('hides edge and border inputs when mode is fill', () => {
+  it('disables edge and border inputs when mode is fill', () => {
     render(
       <BorderControls
         backgroundColor="#ffffff"
@@ -129,7 +129,7 @@ describe('BorderControls', () => {
       />,
     )
 
-    expect(screen.queryByLabelText(/target edge size in pixels/i)).not.toBeInTheDocument()
-    expect(screen.queryByLabelText(/border width in pixels/i)).not.toBeInTheDocument()
+    expect(screen.getByLabelText(/target edge size in pixels/i)).toBeDisabled()
+    expect(screen.getByLabelText(/border width in pixels/i)).toBeDisabled()
   })
 })

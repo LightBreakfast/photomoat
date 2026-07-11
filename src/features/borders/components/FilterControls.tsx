@@ -13,6 +13,7 @@ import {
 type FilterControlsProps = {
   selectedPresetId: FilterPresetId
   onPresetChange: (presetId: FilterPresetId) => void
+  disabled?: boolean
 }
 
 function FilterIcon({ className }: { className?: string }) {
@@ -22,6 +23,7 @@ function FilterIcon({ className }: { className?: string }) {
 export function FilterControls({
   selectedPresetId,
   onPresetChange,
+  disabled = false,
 }: FilterControlsProps) {
   const selectedPreset = getFilterPresetById(selectedPresetId)
 
@@ -31,10 +33,18 @@ export function FilterControls({
         Filters
       </p>
 
-      <div className="overflow-hidden rounded-lg border border-input bg-transparent transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+      <div
+        className={[
+          'overflow-hidden rounded-lg border bg-transparent transition-colors',
+          disabled
+            ? 'border-border opacity-50'
+            : 'border-input focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50',
+        ].join(' ')}
+      >
         <Select
           value={selectedPresetId}
           onValueChange={(value) => onPresetChange(value as FilterPresetId)}
+          disabled={disabled}
         >
           <SelectTrigger
             className="h-auto min-h-12 w-full rounded-none border-0 px-3 py-2.5 shadow-none focus-visible:ring-0"

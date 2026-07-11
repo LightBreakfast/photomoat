@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckSquare,
   ChevronLeft,
   ChevronRight,
   Contrast,
+  Copy,
   Grid3X3,
   Pencil,
   Settings,
@@ -20,8 +21,11 @@ import { WorkspaceModeToggle } from '@/features/borders/components/WorkspaceMode
 import { resolveFilterAdjustments } from '@/features/borders/filterPresets'
 import { getPresetById, instagramPresets } from '@/features/borders/presets'
 import { renderProcessedCanvas } from '@/features/borders/processing/canvasProcessor'
-import type { InspectZoom } from '@/features/borders/types'
-import { useBorderSettings } from '@/features/borders/useBorderSettings'
+import { defaultImageRecipe } from '@/features/borders/defaultImageRecipe'
+import type { ImageEditRecipe, InspectZoom } from '@/features/borders/types'
+import { useExportSettings } from '@/features/borders/useExportSettings'
+import { useImageEdits } from '@/features/borders/useImageEdits'
+import type { CardMenuAction } from '@/shared/components/ImageCard'
 import { Dropzone } from '@/shared/components/Dropzone'
 import { ExportControls } from '@/shared/components/ExportControls'
 import { useImageQueue } from '@/shared/hooks/useImageQueue'
@@ -38,19 +42,24 @@ const inspectZoomOptions: { label: string; value: InspectZoom }[] = [
 ]
 
 export function BorderToolPage() {
+  const defaultRecipe = defaultImageRecipe
+
+  // Export settings (persisted in localStorage)
   const {
-    settings,
-    setPresetId,
-    setBackgroundColor,
+    settings: exportSettings,
     setOutputFormat,
     setJpegQuality,
-    setImageSizingMode,
-    setImageEdgePixels,
-    setBorderWidthPixels,
-    setCustomWidth,
-    setCustomHeight,
-    setFilterPresetId,
-  } = useBorderSettings()
+  } = useExportSettings()
+
+  // Per-image edit state (in-memory)
+  const {
+    initializeImages,
+    removeImage: removeImageRecipe,
+    patchImage,
+    replaceImagesWithRecipe,
+    getRecipe,
+  } = useImageEdits(defaultRecipe)
+
   const { items, message, addFiles, removeItem, setItemStatus } =
     useImageQueue()
 
@@ -75,19 +84,76 @@ export function BorderToolPage() {
     ? readyItems.filter((item) => selectedIds.has(item.id))
     : readyItems
 
+  // Initialize recipes for newly added items
+  const prevItemIdsRef = useRef<Set<string>>(new Set())
+  useEffect(() => {
+    const currentIds = new Set(items.map((item) => item.id))
+    const newIds = items
+      .filter((item) => !prevItemIdsRef.current.has(item.id))
+      .map((item) => item.id)
+
+    if (newIds.length > 0) {
+      initializeImages(newIds)
+    }
+
+    // Clean up recipes for removed items
+    const removedIds = [...prevItemIdsRef.current].filter((id) => !currentIds.has(id))
+    if (removedIds.length > 0) {
+      removeImageRecipe(removedIds)
+    }
+
+    prevItemIdsRef.current = currentIds
+  }, [items, initializeImages, removeImageRecipe])
+
+  // --- Edit target derivation ---
+  const selectedReadyItems = useMemo(
+    () => readyItems.filter((item) => selectedIds.has(item.id)),
+    [readyItems, selectedIds],
+  )
+
+  const singleSelectedReadyItem =
+    selectedReadyItems.length === 1 ? selectedReadyItems[0] : null
+
+  const activeInspectItem = useMemo(
+    () => items.find((item) => item.id === activeItemId) ?? null,
+    [activeItemId, items],
+  )
+
+  const activeInspectReadyItem = useMemo(
+    () => (activeInspectItem?.status === 'ready' ? activeInspectItem : null),
+    [activeInspectItem],
+  )
+
+  // The direct edit target depends on workspace mode
+  const directEditTargetId: string | null = useMemo(() => {
+    if (workspaceMode === 'inspect') {
+      return activeInspectReadyItem?.id ?? null
+    }
+    // browse mode
+    return singleSelectedReadyItem?.id ?? null
+  }, [workspaceMode, activeInspectReadyItem, singleSelectedReadyItem])
+
+  const isDirectEditEnabled = directEditTargetId !== null
+  const isMultiSelectDisabled = workspaceMode === 'browse' && selectedReadyItems.length >= 2
+
+  // Current recipe for the direct edit target
+  const directRecipe: ImageEditRecipe = useMemo(() => {
+    if (directEditTargetId) {
+      return getRecipe(directEditTargetId)
+    }
+    return defaultRecipe
+  }, [directEditTargetId, getRecipe, defaultRecipe])
+
+  // Filter adjustments for preview/compare (compare only affects filters)
   const activeFilterAdjustments = useMemo(
-    () => resolveFilterAdjustments(isCompareActive ? 'original' : settings.filterPresetId),
-    [isCompareActive, settings.filterPresetId],
+    () => resolveFilterAdjustments(isCompareActive ? 'original' : directRecipe.filterPresetId),
+    [isCompareActive, directRecipe.filterPresetId],
   )
 
-  const exportFilterAdjustments = useMemo(
-    () => resolveFilterAdjustments(settings.filterPresetId),
-    [settings.filterPresetId],
-  )
-
-  const selectedPreset = useMemo(
-    () => getPresetById(settings.presetId, settings.customWidth, settings.customHeight),
-    [settings.presetId, settings.customWidth, settings.customHeight],
+  // Selected preset for direct target (used by Inspect, not Browse)
+  const directSelectedPreset = useMemo(
+    () => getPresetById(directRecipe.presetId, directRecipe.customWidth, directRecipe.customHeight),
+    [directRecipe.presetId, directRecipe.customWidth, directRecipe.customHeight],
   )
 
   const activeInspectIndex = useMemo(
@@ -95,7 +161,6 @@ export function BorderToolPage() {
     [activeItemId, items],
   )
 
-  const activeInspectItem = activeInspectIndex >= 0 ? items[activeInspectIndex] : null
   const canInspectPrevious = activeInspectIndex > 0
   const canInspectNext =
     activeInspectIndex >= 0 && activeInspectIndex < items.length - 1
@@ -119,6 +184,123 @@ export function BorderToolPage() {
     setActiveItemId(items[0].id)
   }, [activeItemId, items, workspaceMode])
 
+  // --- Direct edit handlers ---
+  const patchDirectTarget = useCallback(
+    (patch: Partial<ImageEditRecipe>) => {
+      if (directEditTargetId) {
+        patchImage(directEditTargetId, patch)
+      }
+    },
+    [directEditTargetId, patchImage],
+  )
+
+  const handlePresetIdChange = useCallback(
+    (presetId: ImageEditRecipe['presetId']) => {
+      patchDirectTarget({ presetId })
+    },
+    [patchDirectTarget],
+  )
+
+  const handleBackgroundColorChange = useCallback(
+    (backgroundColor: string) => {
+      patchDirectTarget({ backgroundColor })
+    },
+    [patchDirectTarget],
+  )
+
+  const handleImageSizingModeChange = useCallback(
+    (imageSizingMode: ImageEditRecipe['imageSizingMode']) => {
+      patchDirectTarget({ imageSizingMode })
+    },
+    [patchDirectTarget],
+  )
+
+  const handleImageEdgePixelsChange = useCallback(
+    (imageEdgePixels: number) => {
+      patchDirectTarget({ imageEdgePixels })
+    },
+    [patchDirectTarget],
+  )
+
+  const handleBorderWidthPixelsChange = useCallback(
+    (borderWidthPixels: number) => {
+      patchDirectTarget({ borderWidthPixels })
+    },
+    [patchDirectTarget],
+  )
+
+  const handleCustomWidthChange = useCallback(
+    (customWidth: number) => {
+      patchDirectTarget({ customWidth })
+    },
+    [patchDirectTarget],
+  )
+
+  const handleCustomHeightChange = useCallback(
+    (customHeight: number) => {
+      patchDirectTarget({ customHeight })
+    },
+    [patchDirectTarget],
+  )
+
+  const handleFilterPresetIdChange = useCallback(
+    (filterPresetId: ImageEditRecipe['filterPresetId']) => {
+      patchDirectTarget({ filterPresetId })
+    },
+    [patchDirectTarget],
+  )
+
+  // --- Batch apply via card context menu ---
+  const handleApplySourceToSelected = useCallback(
+    (sourceId: string) => {
+      const sourceRecipe = getRecipe(sourceId)
+      const targetIds = selectedReadyItems
+        .filter((item) => item.id !== sourceId)
+        .map((item) => item.id)
+      if (targetIds.length > 0) {
+        replaceImagesWithRecipe(targetIds, sourceRecipe)
+      }
+    },
+    [getRecipe, selectedReadyItems, replaceImagesWithRecipe],
+  )
+
+  // --- Card context menu factory ---
+  const getItemMenuActions = useCallback(
+    (id: string): CardMenuAction[] => {
+      const isSelected = selectedIds.has(id)
+      const hasMultipleSelected = selectedReadyItems.length >= 2
+
+      if (!hasMultipleSelected || !isSelected) {
+        return []
+      }
+
+      return [
+        {
+          label: 'Apply to selected',
+          icon: <Copy size={14} />,
+          onClick: () => handleApplySourceToSelected(id),
+        },
+      ]
+    },
+    [selectedIds, selectedReadyItems, handleApplySourceToSelected],
+  )
+
+  // --- Per-item recipe resolver for Browse ---
+  const getItemRecipe = useCallback(
+    (id: string) => getRecipe(id),
+    [getRecipe],
+  )
+
+  // Per-item filter adjustments for Browse (compare overrides to original)
+  const getItemFilterAdjustments = useCallback(
+    (id: string) => {
+      const recipe = getRecipe(id)
+      return resolveFilterAdjustments(isCompareActive ? 'original' : recipe.filterPresetId)
+    },
+    [getRecipe, isCompareActive],
+  )
+
+  // --- Selection handlers ---
   const handleToggleSelect = (
     id: string,
     event: { metaKey: boolean; ctrlKey: boolean },
@@ -165,19 +347,24 @@ export function BorderToolPage() {
     })
   }
 
+  // --- Export ---
   const createProcessedBlob = async (item: ImageQueueItem) => {
+    const recipe = getRecipe(item.id)
+    const preset = getPresetById(recipe.presetId, recipe.customWidth, recipe.customHeight)
+    const filterAdjustments = resolveFilterAdjustments(recipe.filterPresetId)
+
     const canvas = await renderProcessedCanvas({
       sourceUrl: item.objectUrl,
-      targetWidth: selectedPreset.width,
-      targetHeight: selectedPreset.height,
-      backgroundColor: settings.backgroundColor,
-      sizingMode: settings.imageSizingMode,
-      edgePixels: settings.imageEdgePixels,
-      borderWidthPixels: settings.borderWidthPixels,
-      filterAdjustments: exportFilterAdjustments,
+      targetWidth: preset.width,
+      targetHeight: preset.height,
+      backgroundColor: recipe.backgroundColor,
+      sizingMode: recipe.imageSizingMode,
+      edgePixels: recipe.imageEdgePixels,
+      borderWidthPixels: recipe.borderWidthPixels,
+      filterAdjustments,
     })
 
-    return canvasToBlob(canvas, settings.outputFormat, settings.jpegQuality)
+    return canvasToBlob(canvas, exportSettings.outputFormat, exportSettings.jpegQuality)
   }
 
   const handleSingleDownload = async (item: ImageQueueItem) => {
@@ -187,7 +374,7 @@ export function BorderToolPage() {
 
     try {
       const blob = await createProcessedBlob(item)
-      downloadBlob(blob, createBorderedFilename(item.filename, settings.outputFormat))
+      downloadBlob(blob, createBorderedFilename(item.filename, exportSettings.outputFormat))
       setItemStatus(item.id, 'ready')
       setProgressMessage(`${item.filename} downloaded.`)
     } catch {
@@ -221,7 +408,7 @@ export function BorderToolPage() {
             setItemStatus(item.id, 'ready')
 
             return {
-              filename: createBorderedFilename(item.filename, settings.outputFormat),
+              filename: createBorderedFilename(item.filename, exportSettings.outputFormat),
               blob,
             }
           } catch (error) {
@@ -242,6 +429,7 @@ export function BorderToolPage() {
     }
   }
 
+  // --- Navigation ---
   const handleCompareStart = () => {
     setIsCompareActive(true)
   }
@@ -297,16 +485,20 @@ export function BorderToolPage() {
     handleCompareEnd()
   }
 
+  // --- Footer status ---
   const footerStatus =
     message ??
     (workspaceMode === 'inspect' && activeInspectItem
-      ? activeInspectItem.filename
-      : hasSelection
-        ? `${selectedIds.size} of ${items.length} selected`
-        : items.length > 0
-          ? `${items.length} image${items.length > 1 ? 's' : ''}`
-          : 'Ready')
+      ? `Editing current image · ${activeInspectItem.filename}`
+      : isMultiSelectDisabled
+        ? `${selectedIds.size} images selected`
+        : hasSelection && singleSelectedReadyItem
+          ? singleSelectedReadyItem.filename
+          : items.length > 0
+            ? `${items.length} image${items.length > 1 ? 's' : ''}`
+            : 'Ready')
 
+  // --- Panels ---
   const leftPanelContent = (
     <div className="space-y-5">
       <div className="space-y-2">
@@ -322,8 +514,9 @@ export function BorderToolPage() {
         />
       </div>
       <FilterControls
-        selectedPresetId={settings.filterPresetId}
-        onPresetChange={setFilterPresetId}
+        selectedPresetId={directRecipe.filterPresetId}
+        onPresetChange={handleFilterPresetIdChange}
+        disabled={!isDirectEditEnabled}
       />
     </div>
   )
@@ -332,12 +525,13 @@ export function BorderToolPage() {
     <div className="space-y-5">
       <PresetSelector
         instagramPresets={instagramPresets}
-        selectedPresetId={settings.presetId}
-        onChange={setPresetId}
-        customWidth={settings.customWidth}
-        customHeight={settings.customHeight}
-        onCustomWidthChange={setCustomWidth}
-        onCustomHeightChange={setCustomHeight}
+        selectedPresetId={directRecipe.presetId}
+        onChange={handlePresetIdChange}
+        customWidth={directRecipe.customWidth}
+        customHeight={directRecipe.customHeight}
+        onCustomWidthChange={handleCustomWidthChange}
+        onCustomHeightChange={handleCustomHeightChange}
+        disabled={!isDirectEditEnabled}
       />
 
       <div className="space-y-3 border-t border-border pt-3">
@@ -345,14 +539,15 @@ export function BorderToolPage() {
           Border
         </p>
         <BorderControls
-          backgroundColor={settings.backgroundColor}
-          imageSizingMode={settings.imageSizingMode}
-          imageEdgePixels={settings.imageEdgePixels}
-          borderWidthPixels={settings.borderWidthPixels}
-          onBackgroundColorChange={setBackgroundColor}
-          onImageSizingModeChange={setImageSizingMode}
-          onImageEdgePixelsChange={setImageEdgePixels}
-          onBorderWidthPixelsChange={setBorderWidthPixels}
+          backgroundColor={directRecipe.backgroundColor}
+          imageSizingMode={directRecipe.imageSizingMode}
+          imageEdgePixels={directRecipe.imageEdgePixels}
+          borderWidthPixels={directRecipe.borderWidthPixels}
+          onBackgroundColorChange={handleBackgroundColorChange}
+          onImageSizingModeChange={handleImageSizingModeChange}
+          onImageEdgePixelsChange={handleImageEdgePixelsChange}
+          onBorderWidthPixelsChange={handleBorderWidthPixelsChange}
+          disabled={!isDirectEditEnabled}
         />
       </div>
 
@@ -364,8 +559,8 @@ export function BorderToolPage() {
           <ExportControls
             variant="batch"
             disabled={exportItems.length === 0}
-            outputFormat={settings.outputFormat}
-            jpegQuality={settings.jpegQuality}
+            outputFormat={exportSettings.outputFormat}
+            jpegQuality={exportSettings.jpegQuality}
             onOutputFormatChange={setOutputFormat}
             onJpegQualityChange={setJpegQuality}
             onBatchExport={handleBatchExport}
@@ -374,6 +569,7 @@ export function BorderToolPage() {
           />
         </div>
       ) : null}
+
     </div>
   )
 
@@ -421,12 +617,9 @@ export function BorderToolPage() {
             <div className="flex flex-1 min-h-0 overflow-y-auto">
               <BrowseWorkspace
                 items={items}
-                preset={selectedPreset}
-                backgroundColor={settings.backgroundColor}
-                sizingMode={settings.imageSizingMode}
-                edgePixels={settings.imageEdgePixels}
-                borderWidthPixels={settings.borderWidthPixels}
-                filterAdjustments={activeFilterAdjustments}
+                getItemRecipe={getItemRecipe}
+                getItemFilterAdjustments={getItemFilterAdjustments}
+                getItemMenuActions={getItemMenuActions}
                 columns={columns}
                 activeDownloadId={activeDownloadId}
                 selectedIds={selectedIds}
@@ -439,11 +632,11 @@ export function BorderToolPage() {
           ) : (
             <InspectWorkspace
               item={activeInspectItem}
-              preset={selectedPreset}
-              backgroundColor={settings.backgroundColor}
-              sizingMode={settings.imageSizingMode}
-              edgePixels={settings.imageEdgePixels}
-              borderWidthPixels={settings.borderWidthPixels}
+              preset={directSelectedPreset}
+              backgroundColor={directRecipe.backgroundColor}
+              sizingMode={directRecipe.imageSizingMode}
+              edgePixels={directRecipe.imageEdgePixels}
+              borderWidthPixels={directRecipe.borderWidthPixels}
               filterAdjustments={activeFilterAdjustments}
               inspectZoom={inspectZoom}
             />

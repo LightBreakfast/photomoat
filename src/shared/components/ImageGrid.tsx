@@ -1,15 +1,13 @@
-import type { FilterAdjustments, ImageSizingMode } from '@/features/borders/types'
-import type { ImageQueueItem, OutputPreset } from '@/shared/types'
-import { ImageCard } from '@/shared/components/ImageCard'
+import type { FilterAdjustments, ImageEditRecipe } from '@/features/borders/types'
+import { getPresetById } from '@/features/borders/presets'
+import type { ImageQueueItem } from '@/shared/types'
+import { ImageCard, type CardMenuAction } from '@/shared/components/ImageCard'
 
 type ImageGridProps = {
   items: ImageQueueItem[]
-  preset: OutputPreset
-  backgroundColor: string
-  sizingMode: ImageSizingMode
-  edgePixels: number
-  borderWidthPixels: number
-  filterAdjustments?: FilterAdjustments
+  getItemRecipe: (id: string) => ImageEditRecipe
+  getItemFilterAdjustments: (id: string) => FilterAdjustments
+  getItemMenuActions?: (id: string) => CardMenuAction[]
   columns?: number
   activeDownloadId?: string | null
   selectedIds?: Set<string>
@@ -30,12 +28,9 @@ const columnClasses: Record<number, string> = {
 
 export function ImageGrid({
   items,
-  preset,
-  backgroundColor,
-  sizingMode,
-  edgePixels,
-  borderWidthPixels,
-  filterAdjustments,
+  getItemRecipe,
+  getItemFilterAdjustments,
+  getItemMenuActions,
   columns = 3,
   activeDownloadId,
   selectedIds,
@@ -50,24 +45,32 @@ export function ImageGrid({
 
   return (
     <div className={`grid items-start gap-3 ${columnClasses[columns] ?? columnClasses[3]}`}>
-      {items.map((item, index) => (
-        <ImageCard
-          key={item.id}
-          item={item}
-          preset={preset}
-          backgroundColor={backgroundColor}
-          sizingMode={sizingMode}
-          edgePixels={edgePixels}
-          borderWidthPixels={borderWidthPixels}
-          filterAdjustments={filterAdjustments}
-          isDownloading={activeDownloadId === item.id}
-          isSelected={selectedIds?.has(item.id)}
-          onRemove={() => onRemove(item.id)}
-          onDownload={() => onDownload(item)}
-          onInspect={onInspect ? () => onInspect(index) : undefined}
-          onToggleSelect={onToggleSelect ? (event) => onToggleSelect(item.id, event) : undefined}
-        />
-      ))}
+      {items.map((item, index) => {
+        const recipe = getItemRecipe(item.id)
+        const preset = getPresetById(recipe.presetId, recipe.customWidth, recipe.customHeight)
+        const filterAdjustments = getItemFilterAdjustments(item.id)
+        const menuActions = getItemMenuActions?.(item.id)
+
+        return (
+          <ImageCard
+            key={item.id}
+            item={item}
+            preset={preset}
+            backgroundColor={recipe.backgroundColor}
+            sizingMode={recipe.imageSizingMode}
+            edgePixels={recipe.imageEdgePixels}
+            borderWidthPixels={recipe.borderWidthPixels}
+            filterAdjustments={filterAdjustments}
+            isDownloading={activeDownloadId === item.id}
+            isSelected={selectedIds?.has(item.id)}
+            menuActions={menuActions}
+            onRemove={() => onRemove(item.id)}
+            onDownload={() => onDownload(item)}
+            onInspect={onInspect ? () => onInspect(index) : undefined}
+            onToggleSelect={onToggleSelect ? (event) => onToggleSelect(item.id, event) : undefined}
+          />
+        )
+      })}
     </div>
   )
 }

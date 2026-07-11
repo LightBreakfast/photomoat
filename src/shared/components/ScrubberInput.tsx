@@ -88,19 +88,17 @@ export function ScrubberInput({
     [disabled, value, step, clampValue, onChange],
   )
 
-  if (disabled) {
-    return null
-  }
-
   return (
     <label className="block min-w-0 space-y-1">
       <span
         onMouseDown={handleMouseDown}
         className={[
           'inline-block px-1 text-xs font-medium text-muted select-none',
-          isDragging
-            ? 'cursor-ew-resize underline underline-offset-2 decoration-accent'
-            : 'cursor-col-resize hover:text-foreground',
+          disabled
+            ? 'cursor-not-allowed opacity-50'
+            : isDragging
+              ? 'cursor-ew-resize underline underline-offset-2 decoration-accent'
+              : 'cursor-col-resize hover:text-foreground',
         ].join(' ')}
       >
         {label}
@@ -116,7 +114,8 @@ export function ScrubberInput({
             commit()
           }
         }}
-        className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-right text-sm tabular-nums"
+        disabled={disabled}
+        className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-right text-sm tabular-nums disabled:cursor-not-allowed disabled:opacity-50"
         aria-label={ariaLabel}
       />
     </label>

@@ -25,6 +25,7 @@ type PresetSelectorProps = {
   customHeight?: number
   onCustomWidthChange?: (width: number) => void
   onCustomHeightChange?: (height: number) => void
+  disabled?: boolean
 }
 
 type PresetSummaryProps = {
@@ -79,6 +80,7 @@ export function PresetSelector({
   customHeight = 1080,
   onCustomWidthChange,
   onCustomHeightChange,
+  disabled = false,
 }: PresetSelectorProps) {
   const selectedPreset = instagramPresets.find((preset) => preset.id === selectedPresetId)
   const isCustomSelected = selectedPresetId === 'custom'
@@ -95,10 +97,18 @@ export function PresetSelector({
     <div className="space-y-1">
       <p className="text-xs font-medium uppercase tracking-wider text-muted">Size</p>
 
-      <div className="overflow-hidden rounded-lg border border-input bg-transparent transition-colors focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50">
+      <div
+        className={[
+          'overflow-hidden rounded-lg border bg-transparent transition-colors',
+          disabled
+            ? 'border-border opacity-50'
+            : 'border-input focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50',
+        ].join(' ')}
+      >
         <Select
           value={selectedPresetId}
           onValueChange={(value) => onChange(value as OutputPresetId)}
+          disabled={disabled}
         >
           <SelectTrigger
             className="h-auto min-h-16 w-full rounded-none border-0 px-3 py-3 shadow-none focus-visible:ring-0"
@@ -160,6 +170,7 @@ export function PresetSelector({
                 max={customSizeMax}
                 onChange={onCustomWidthChange}
                 ariaLabel="Custom width in pixels"
+                disabled={disabled}
               />
               <ScrubberInput
                 label="Height"
@@ -168,6 +179,7 @@ export function PresetSelector({
                 max={customSizeMax}
                 onChange={onCustomHeightChange}
                 ariaLabel="Custom height in pixels"
+                disabled={disabled}
               />
             </div>
           </div>
