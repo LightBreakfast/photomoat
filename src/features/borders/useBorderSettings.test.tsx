@@ -24,6 +24,7 @@ describe('useBorderSettings', () => {
       result.current.setImageSizingMode('border-width')
       result.current.setImageEdgePixels(840)
       result.current.setBorderWidthPixels(72)
+      result.current.setMinVerticalPaddingPixels(48)
       result.current.setCustomWidth(1920)
       result.current.setCustomHeight(1080)
       result.current.setFilterPresetId('ember')
@@ -37,6 +38,7 @@ describe('useBorderSettings', () => {
       imageSizingMode: 'border-width',
       imageEdgePixels: 840,
       borderWidthPixels: 72,
+      minVerticalPaddingPixels: 48,
       customWidth: 1920,
       customHeight: 1080,
       filterPresetId: 'ember',

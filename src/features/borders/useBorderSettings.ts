@@ -19,6 +19,7 @@ const defaultSettings: BorderSettings = {
   imageSizingMode: 'contain',
   imageEdgePixels: 900,
   borderWidthPixels: 90,
+  minVerticalPaddingPixels: 90,
   customWidth: defaultCustomWidth,
   customHeight: defaultCustomHeight,
   filterPresetId: defaultFilterPresetId,
@@ -54,6 +55,7 @@ function sanitizeSettings(settings: Partial<BorderSettings>) {
       settings.imageSizingMode === 'long-edge' ||
       settings.imageSizingMode === 'short-edge' ||
       settings.imageSizingMode === 'border-width' ||
+      settings.imageSizingMode === 'fixed-sides' ||
       settings.imageSizingMode === 'fill'
         ? settings.imageSizingMode
         : 'contain',
@@ -64,6 +66,10 @@ function sanitizeSettings(settings: Partial<BorderSettings>) {
     borderWidthPixels: sanitizePositiveInteger(
       settings.borderWidthPixels,
       defaultSettings.borderWidthPixels,
+    ),
+    minVerticalPaddingPixels: sanitizePositiveInteger(
+      settings.minVerticalPaddingPixels,
+      defaultSettings.minVerticalPaddingPixels,
     ),
     customWidth: sanitizePositiveIntegerInRange(
       settings.customWidth,
@@ -127,6 +133,11 @@ export function useBorderSettings() {
       setSettings((current) => ({
         ...current,
         borderWidthPixels: Math.max(1, Math.round(borderWidthPixels)),
+      })),
+    setMinVerticalPaddingPixels: (minVerticalPaddingPixels: number) =>
+      setSettings((current) => ({
+        ...current,
+        minVerticalPaddingPixels: Math.max(1, Math.round(minVerticalPaddingPixels)),
       })),
     setCustomWidth: (customWidth: number) =>
       setSettings((current) => ({

@@ -13,6 +13,7 @@ export type ImagePlacementInput = ContainRectInput & {
   sizingMode?: ImageSizingMode
   edgePixels?: number
   borderWidthPixels?: number
+  minVerticalPaddingPixels?: number
 }
 
 export type ContainRect = {
@@ -37,6 +38,7 @@ type DrawImageOptions = {
   sizingMode?: ImageSizingMode
   edgePixels?: number
   borderWidthPixels?: number
+  minVerticalPaddingPixels?: number
   filterAdjustments?: FilterAdjustments
 }
 
@@ -48,6 +50,7 @@ type RenderCanvasOptions = {
   sizingMode?: ImageSizingMode
   edgePixels?: number
   borderWidthPixels?: number
+  minVerticalPaddingPixels?: number
   filterAdjustments?: FilterAdjustments
 }
 
@@ -72,6 +75,43 @@ function getClampedHorizontalPadding(borderWidthPixels: number, targetWidth: num
   return Math.max(0, Math.min(Math.round(borderWidthPixels), Math.floor((targetWidth - 1) / 2)))
 }
 
+function getClampedVerticalPadding(minVerticalPaddingPixels: number, targetHeight: number) {
+  return Math.max(
+    0,
+    Math.min(Math.round(minVerticalPaddingPixels), Math.floor((targetHeight - 1) / 2)),
+  )
+}
+
+type InsetRect = {
+  x: number
+  y: number
+  width: number
+  height: number
+}
+
+function calculateFixedSidesInsetRect(
+  targetWidth: number,
+  targetHeight: number,
+  borderWidthPixels: number,
+  minVerticalPaddingPixels: number,
+): InsetRect | null {
+  const clampedSidePadding = getClampedHorizontalPadding(borderWidthPixels, targetWidth)
+  const clampedVerticalPadding = getClampedVerticalPadding(minVerticalPaddingPixels, targetHeight)
+  const innerWidth = targetWidth - clampedSidePadding * 2
+  const innerHeight = targetHeight - clampedVerticalPadding * 2
+
+  if (innerWidth <= 0 || innerHeight <= 0) {
+    return null
+  }
+
+  return {
+    x: clampedSidePadding,
+    y: clampedVerticalPadding,
+    width: innerWidth,
+    height: innerHeight,
+  }
+}
+
 export function calculateImagePlacementRect({
   sourceWidth,
   sourceHeight,
@@ -80,6 +120,7 @@ export function calculateImagePlacementRect({
   sizingMode = 'contain',
   edgePixels,
   borderWidthPixels,
+  minVerticalPaddingPixels,
 }: ImagePlacementInput): ContainRect {
   const containRect = calculateContainRect({
     sourceWidth,
@@ -104,6 +145,31 @@ export function calculateImagePlacementRect({
       x: clampedHorizontalPadding + contentRect.x,
       y: contentRect.y,
     }
+  }
+
+  if (
+    sizingMode === 'fixed-sides' &&
+    borderWidthPixels &&
+    borderWidthPixels > 0
+  ) {
+    const insetRect = calculateFixedSidesInsetRect(
+      targetWidth,
+      targetHeight,
+      borderWidthPixels,
+      minVerticalPaddingPixels ?? borderWidthPixels,
+    )
+
+    if (!insetRect) {
+      return containRect
+    }
+
+    const scale = insetRect.width / sourceWidth
+    const drawWidth = insetRect.width
+    const drawHeight = sourceHeight * scale
+    const x = insetRect.x
+    const y = (targetHeight - drawHeight) / 2
+
+    return { scale, drawWidth, drawHeight, x, y }
   }
 
   if (sizingMode === 'fill') {
@@ -158,6 +224,7 @@ export function drawImageOnCanvas({
   sizingMode,
   edgePixels,
   borderWidthPixels,
+  minVerticalPaddingPixels,
   filterAdjustments,
 }: DrawImageOptions) {
   const canvas = context.canvas
@@ -178,15 +245,43 @@ export function drawImageOnCanvas({
     sizingMode,
     edgePixels,
     borderWidthPixels,
+    minVerticalPaddingPixels,
   })
 
-  if (filterAdjustments && !isNeutralFilter(filterAdjustments)) {
-    context.filter = buildCanvasFilter(filterAdjustments)
+  const fixedSidesInsetRect =
+    sizingMode === 'fixed-sides' && borderWidthPixels && borderWidthPixels > 0
+      ? calculateFixedSidesInsetRect(
+          targetWidth,
+          targetHeight,
+          borderWidthPixels,
+          minVerticalPaddingPixels ?? borderWidthPixels,
+        )
+      : null
+
+  if (fixedSidesInsetRect) {
+    context.save()
+    context.beginPath()
+    context.rect(
+      fixedSidesInsetRect.x,
+      fixedSidesInsetRect.y,
+      fixedSidesInsetRect.width,
+      fixedSidesInsetRect.height,
+    )
+    context.clip()
   }
 
-  context.drawImage(image, x, y, drawWidth, drawHeight)
+  try {
+    if (filterAdjustments && !isNeutralFilter(filterAdjustments)) {
+      context.filter = buildCanvasFilter(filterAdjustments)
+    }
 
-  context.filter = 'none'
+    context.drawImage(image, x, y, drawWidth, drawHeight)
+    context.filter = 'none'
+  } finally {
+    if (fixedSidesInsetRect) {
+      context.restore()
+    }
+  }
 }
 
 export async function renderProcessedCanvas({
@@ -197,6 +292,7 @@ export async function renderProcessedCanvas({
   sizingMode,
   edgePixels,
   borderWidthPixels,
+  minVerticalPaddingPixels,
   filterAdjustments,
 }: RenderCanvasOptions) {
   const image = await loadImageElement(sourceUrl)
@@ -216,6 +312,7 @@ export async function renderProcessedCanvas({
     sizingMode,
     edgePixels,
     borderWidthPixels,
+    minVerticalPaddingPixels,
     filterAdjustments,
   })
 

@@ -13,6 +13,7 @@ type InspectWorkspaceProps = {
   sizingMode: ImageSizingMode
   edgePixels: number
   borderWidthPixels: number
+  minVerticalPaddingPixels: number
   filterAdjustments?: FilterAdjustments
   inspectZoom: InspectZoom
 }
@@ -24,6 +25,7 @@ export function InspectWorkspace({
   sizingMode,
   edgePixels,
   borderWidthPixels,
+  minVerticalPaddingPixels,
   filterAdjustments,
   inspectZoom,
 }: InspectWorkspaceProps) {
@@ -56,6 +58,7 @@ export function InspectWorkspace({
           sizingMode={sizingMode}
           edgePixels={edgePixels}
           borderWidthPixels={borderWidthPixels}
+          minVerticalPaddingPixels={minVerticalPaddingPixels}
           filterAdjustments={filterAdjustments}
           label={`Inspect: ${item.filename}`}
           fullSize

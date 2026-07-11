@@ -1,6 +1,6 @@
 import type { ExportFormat, OutputPresetId } from '@/shared/types'
 
-export type ImageSizingMode = 'contain' | 'long-edge' | 'short-edge' | 'border-width' | 'fill'
+export type ImageSizingMode = 'contain' | 'long-edge' | 'short-edge' | 'border-width' | 'fixed-sides' | 'fill'
 
 export const filterPresetIds = ['original', 'drift', 'ember', 'coast', 'muse', 'noir'] as const
 
@@ -27,6 +27,7 @@ export type ImageEditRecipe = {
   imageSizingMode: ImageSizingMode
   imageEdgePixels: number
   borderWidthPixels: number
+  minVerticalPaddingPixels: number
   customWidth: number
   customHeight: number
   filterPresetId: FilterPresetId

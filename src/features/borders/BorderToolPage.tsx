@@ -230,6 +230,13 @@ export function BorderToolPage() {
     [patchDirectTarget],
   )
 
+  const handleMinVerticalPaddingPixelsChange = useCallback(
+    (minVerticalPaddingPixels: number) => {
+      patchDirectTarget({ minVerticalPaddingPixels })
+    },
+    [patchDirectTarget],
+  )
+
   const handleCustomWidthChange = useCallback(
     (customWidth: number) => {
       patchDirectTarget({ customWidth })
@@ -362,6 +369,7 @@ export function BorderToolPage() {
       sizingMode: recipe.imageSizingMode,
       edgePixels: recipe.imageEdgePixels,
       borderWidthPixels: recipe.borderWidthPixels,
+      minVerticalPaddingPixels: recipe.minVerticalPaddingPixels,
       filterAdjustments,
     })
 
@@ -557,10 +565,12 @@ export function BorderToolPage() {
           imageSizingMode={directRecipe.imageSizingMode}
           imageEdgePixels={directRecipe.imageEdgePixels}
           borderWidthPixels={directRecipe.borderWidthPixels}
+          minVerticalPaddingPixels={directRecipe.minVerticalPaddingPixels}
           onBackgroundColorChange={handleBackgroundColorChange}
           onImageSizingModeChange={handleImageSizingModeChange}
           onImageEdgePixelsChange={handleImageEdgePixelsChange}
           onBorderWidthPixelsChange={handleBorderWidthPixelsChange}
+          onMinVerticalPaddingPixelsChange={handleMinVerticalPaddingPixelsChange}
           disabled={!isDirectEditEnabled}
         />
       </SidebarSection>
@@ -648,6 +658,7 @@ export function BorderToolPage() {
               sizingMode={directRecipe.imageSizingMode}
               edgePixels={directRecipe.imageEdgePixels}
               borderWidthPixels={directRecipe.borderWidthPixels}
+              minVerticalPaddingPixels={directRecipe.minVerticalPaddingPixels}
               filterAdjustments={activeFilterAdjustments}
               inspectZoom={inspectZoom}
             />

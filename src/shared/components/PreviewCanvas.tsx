@@ -12,6 +12,7 @@ type PreviewCanvasProps = {
   sizingMode: ImageSizingMode
   edgePixels: number
   borderWidthPixels: number
+  minVerticalPaddingPixels: number
   filterAdjustments?: FilterAdjustments
   label: string
   fullSize?: boolean
@@ -40,6 +41,7 @@ export function PreviewCanvas({
   sizingMode,
   edgePixels,
   borderWidthPixels,
+  minVerticalPaddingPixels,
   filterAdjustments,
   label,
   fullSize = false,
@@ -106,6 +108,7 @@ export function PreviewCanvas({
           sizingMode,
           edgePixels: scalePreviewPixels(edgePixels, scale),
           borderWidthPixels: scalePreviewPixels(borderWidthPixels, scale),
+          minVerticalPaddingPixels: scalePreviewPixels(minVerticalPaddingPixels, scale),
           filterAdjustments,
         })
         setHasError(false)
@@ -125,6 +128,7 @@ export function PreviewCanvas({
     backgroundColor,
     borderWidthPixels,
     edgePixels,
+    minVerticalPaddingPixels,
     filterAdjustments,
     fullSize,
     fullSizeDimensions,
