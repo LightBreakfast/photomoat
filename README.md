@@ -1,16 +1,16 @@
 # PhotoMoat
 
-Add clean Instagram borders to JPG and PNG images. Runs entirely in your browser — nothing is uploaded.
+Add clean Instagram borders to your photos, right in the browser. Nothing gets uploaded anywhere.
 
-## Features
+## What it does
 
-- Instagram presets (Square, Portrait, Story, Landscape, 4:5)
-- Custom background colours
-- Flexible image sizing (auto fit, long edge, short edge, fixed border width)
-- Batch export as ZIP
-- Light/dark theme
-- Keyboard-navigable image viewer
-- Fully accessible, WCAG AA contrast compliant
+- Instagram presets: Square, Portrait, Story, Landscape, and 4:5
+- Pick any background color
+- Several ways to fit your image: auto fit, long edge, short edge, and fixed border width
+- Export a batch of images as a ZIP
+- Light and dark theme
+- Keyboard-friendly image viewer
+- Accessible (WCAG AA)
 
 ## Development
 
@@ -23,4 +23,4 @@ npm run build     # production build
 
 ## Deploy
 
-Push to `main` — GitHub Actions builds and deploys to GitHub Pages automatically.
+Push to `main`. GitHub Actions builds the site and deploys to GitHub Pages.
