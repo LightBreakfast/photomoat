@@ -1,28 +1,16 @@
 import { useEffect, useState } from 'react'
 
-import {
-  customSizeMax,
-  customSizeMin,
-  defaultCustomHeight,
-  defaultCustomWidth,
-} from '@/features/borders/constants'
+import { customSizeMax, customSizeMin } from '@/features/borders/constants'
+import { defaultImageRecipe } from '@/features/borders/defaultImageRecipe'
 import { defaultFilterPresetId, isFilterPresetId } from '@/features/borders/filterPresets'
 import type { BorderSettings, FilterPresetId } from '@/features/borders/types'
+import { defaultExportSettings } from '@/features/borders/useExportSettings'
 
 export const borderSettingsStorageKey = 'photomoat-border-settings'
 
 const defaultSettings: BorderSettings = {
-  presetId: 'instagram-square',
-  backgroundColor: '#ffffff',
-  outputFormat: 'image/png',
-  jpegQuality: 0.92,
-  imageSizingMode: 'contain',
-  imageEdgePixels: 900,
-  borderWidthPixels: 90,
-  minVerticalPaddingPixels: 90,
-  customWidth: defaultCustomWidth,
-  customHeight: defaultCustomHeight,
-  filterPresetId: defaultFilterPresetId,
+  ...defaultImageRecipe,
+  ...defaultExportSettings,
 }
 
 function sanitizePositiveInteger(value: unknown, fallback: number) {
@@ -58,7 +46,7 @@ function sanitizeSettings(settings: Partial<BorderSettings>) {
       settings.imageSizingMode === 'fixed-sides' ||
       settings.imageSizingMode === 'fill'
         ? settings.imageSizingMode
-        : 'contain',
+        : defaultSettings.imageSizingMode,
     imageEdgePixels: sanitizePositiveInteger(
       settings.imageEdgePixels,
       defaultSettings.imageEdgePixels,
