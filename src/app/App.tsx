@@ -3,6 +3,7 @@ import { Info } from 'lucide-react'
 
 import { BorderToolPage } from '@/features/borders/BorderToolPage'
 import { GitHubMarkIcon } from '@/shared/components/icons/GitHubMarkIcon'
+import { Logo } from '@/shared/components/Logo'
 import { ThemeToggle } from '@/shared/components/ThemeToggle'
 
 export default function App() {
@@ -11,9 +12,7 @@ export default function App() {
   return (
     <div className="flex h-screen flex-col bg-background text-foreground">
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-border px-4">
-        <p className="text-sm font-semibold tracking-tight text-foreground">
-          PhotoMoat
-        </p>
+        <Logo className="h-6 w-auto text-foreground" />
         <div className="flex items-center gap-2">
           <a
             href="https://github.com/LightBreakfast/photomoat"
