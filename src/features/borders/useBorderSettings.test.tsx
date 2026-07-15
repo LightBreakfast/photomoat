@@ -105,4 +105,15 @@ describe('useBorderSettings', () => {
 
     expect(result.current.settings.filterPresetId).toBe('original')
   })
+
+  it('falls back to the current default sizing mode for invalid persisted image sizing mode', () => {
+    window.localStorage.setItem(
+      borderSettingsStorageKey,
+      JSON.stringify({ imageSizingMode: 'not-a-real-mode' }),
+    )
+
+    const { result } = renderHook(() => useBorderSettings())
+
+    expect(result.current.settings.imageSizingMode).toBe(defaultBorderSettings.imageSizingMode)
+  })
 })

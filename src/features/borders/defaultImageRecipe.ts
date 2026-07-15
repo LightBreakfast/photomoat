@@ -6,12 +6,12 @@ import { defaultFilterPresetId } from '@/features/borders/filterPresets'
 import type { ImageEditRecipe } from '@/features/borders/types'
 
 export const defaultImageRecipe: ImageEditRecipe = {
-  presetId: 'instagram-square',
+  presetId: 'instagram-portrait',
   backgroundColor: '#ffffff',
-  imageSizingMode: 'contain',
+  imageSizingMode: 'fixed-sides',
   imageEdgePixels: 900,
-  borderWidthPixels: 90,
-  minVerticalPaddingPixels: 90,
+  borderWidthPixels: 120,
+  minVerticalPaddingPixels: 30,
   customWidth: defaultCustomWidth,
   customHeight: defaultCustomHeight,
   filterPresetId: defaultFilterPresetId,
