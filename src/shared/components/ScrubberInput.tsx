@@ -11,6 +11,8 @@ type ScrubberInputProps = {
   max?: number
   step?: number
   onChange: (value: number) => void
+  /** Fired once when a gesture finalises (mouseup, blur, or Enter). */
+  onCommit?: (value: number) => void
   ariaLabel: string
   layout?: ScrubberInputLayout
 }
@@ -24,6 +26,7 @@ export function ScrubberInput({
   max,
   step = 1,
   onChange,
+  onCommit,
   ariaLabel,
   layout = 'stacked',
 }: ScrubberInputProps) {
@@ -31,6 +34,7 @@ export function ScrubberInput({
   const [isDragging, setIsDragging] = useState(false)
   const lastPropRef = useRef(value)
   const dragStartRef = useRef<{ x: number; startValue: number } | null>(null)
+  const dragValueRef = useRef(value)
 
   useEffect(() => {
     if (lastPropRef.current !== value) {
@@ -53,7 +57,9 @@ export function ScrubberInput({
     const parsed = Number(localValue)
 
     if (Number.isFinite(parsed) && parsed >= min) {
-      onChange(clampValue(parsed))
+      const clamped = clampValue(parsed)
+      onChange(clamped)
+      onCommit?.(clamped)
     } else {
       setLocalValue(String(lastPropRef.current))
     }
@@ -77,6 +83,7 @@ export function ScrubberInput({
         if (moveEvent.altKey || moveEvent.metaKey) multiplier *= 0.1
 
         const newValue = clampValue(dragStartRef.current.startValue + deltaX * multiplier)
+        dragValueRef.current = newValue
         setLocalValue(String(newValue))
         onChange(newValue)
       }
@@ -86,12 +93,13 @@ export function ScrubberInput({
         setIsDragging(false)
         document.removeEventListener('mousemove', handleMouseMove)
         document.removeEventListener('mouseup', handleMouseUp)
+        onCommit?.(dragValueRef.current)
       }
 
       document.addEventListener('mousemove', handleMouseMove)
       document.addEventListener('mouseup', handleMouseUp)
     },
-    [disabled, value, step, clampValue, onChange],
+    [disabled, value, step, clampValue, onChange, onCommit],
   )
 
   const isInline = layout === 'inline'

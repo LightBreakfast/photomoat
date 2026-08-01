@@ -19,10 +19,14 @@ type BorderControlsProps = {
   borderWidthPixels: number
   minVerticalPaddingPixels: number
   onBackgroundColorChange: (color: string) => void
+  onBackgroundColorCommit?: (color: string) => void
   onImageSizingModeChange: (mode: ImageSizingMode) => void
   onImageEdgePixelsChange: (pixels: number) => void
+  onImageEdgePixelsCommit?: (pixels: number) => void
   onBorderWidthPixelsChange: (pixels: number) => void
+  onBorderWidthPixelsCommit?: (pixels: number) => void
   onMinVerticalPaddingPixelsChange: (pixels: number) => void
+  onMinVerticalPaddingPixelsCommit?: (pixels: number) => void
   disabled?: boolean
 }
 
@@ -41,10 +45,14 @@ export function BorderControls({
   borderWidthPixels,
   minVerticalPaddingPixels,
   onBackgroundColorChange,
+  onBackgroundColorCommit,
   onImageSizingModeChange,
   onImageEdgePixelsChange,
+  onImageEdgePixelsCommit,
   onBorderWidthPixelsChange,
+  onBorderWidthPixelsCommit,
   onMinVerticalPaddingPixelsChange,
+  onMinVerticalPaddingPixelsCommit,
   disabled = false,
 }: BorderControlsProps) {
   return (
@@ -60,7 +68,10 @@ export function BorderControls({
               type="button"
               aria-label={`Use ${swatch} background`}
               aria-pressed={swatch.toLowerCase() === backgroundColor.toLowerCase()}
-              onClick={() => onBackgroundColorChange(swatch)}
+              onClick={() => {
+                onBackgroundColorChange(swatch)
+                onBackgroundColorCommit?.(swatch)
+              }}
               disabled={disabled}
               className="h-7 w-7 rounded-md border border-border disabled:cursor-not-allowed disabled:opacity-50"
               style={{ backgroundColor: swatch }}
@@ -71,7 +82,11 @@ export function BorderControls({
             <input
               type="color"
               value={backgroundColor}
-              onChange={(event) => onBackgroundColorChange(event.target.value)}
+              onChange={(event) => {
+                const color = event.target.value
+                onBackgroundColorChange(color)
+                onBackgroundColorCommit?.(color)
+              }}
               disabled={disabled}
               className="sr-only"
               aria-label="Pick custom background colour"
@@ -82,6 +97,12 @@ export function BorderControls({
           type="text"
           value={backgroundColor}
           onChange={(event) => onBackgroundColorChange(event.target.value)}
+          onBlur={(event) => onBackgroundColorCommit?.(event.currentTarget.value)}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter') {
+              event.currentTarget.blur()
+            }
+          }}
           disabled={disabled}
           className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           inputMode="text"
@@ -133,6 +154,7 @@ export function BorderControls({
             value={imageEdgePixels}
             disabled={disabled}
             onChange={onImageEdgePixelsChange}
+            onCommit={onImageEdgePixelsCommit}
             ariaLabel="Target edge size in pixels"
             layout="inline"
           />
@@ -145,6 +167,7 @@ export function BorderControls({
             value={minVerticalPaddingPixels}
             disabled={disabled}
             onChange={onMinVerticalPaddingPixelsChange}
+            onCommit={onMinVerticalPaddingPixelsCommit}
             ariaLabel="Minimum vertical padding in pixels"
             layout="inline"
           />
@@ -157,6 +180,7 @@ export function BorderControls({
             value={borderWidthPixels}
             disabled={disabled}
             onChange={onBorderWidthPixelsChange}
+            onCommit={onBorderWidthPixelsCommit}
             ariaLabel="Horizontal padding in pixels"
             layout="inline"
           />

@@ -20,12 +20,14 @@ import { SidebarSection } from '@/features/borders/components/SidebarSection'
 import { WorkspaceFooterIconButton } from '@/features/borders/components/WorkspaceFooterIconButton'
 import { WorkspaceModeToggle } from '@/features/borders/components/WorkspaceModeToggle'
 import { resolveFilterAdjustments } from '@/features/borders/filterPresets'
+import { HistoryPanel } from '@/features/borders/components/HistoryPanel'
 import { getPresetById, instagramPresets } from '@/features/borders/presets'
 import { renderProcessedCanvas } from '@/features/borders/processing/canvasProcessor'
 import { defaultImageRecipe } from '@/features/borders/defaultImageRecipe'
 import type { ImageEditRecipe, InspectZoom } from '@/features/borders/types'
 import { useExportSettings } from '@/features/borders/useExportSettings'
 import { useImageEdits } from '@/features/borders/useImageEdits'
+import { useUndoRedoShortcuts } from '@/features/borders/useUndoRedoShortcuts'
 import type { CardMenuAction } from '@/shared/components/ImageCard'
 import { Dropzone } from '@/shared/components/Dropzone'
 import { ExportControls } from '@/shared/components/ExportControls'
@@ -57,8 +59,13 @@ export function BorderToolPage() {
     initializeImages,
     removeImages: removeImageRecipes,
     patchImage,
+    patchImageLive,
     replaceImagesWithRecipe,
+    undo,
+    redo,
+    jumpToIndex,
     getRecipe,
+    getTimeline,
   } = useImageEdits(defaultRecipe)
 
   const { items, message, addFiles, removeItem, setItemStatus } =
@@ -134,6 +141,12 @@ export function BorderToolPage() {
     return singleSelectedReadyItem?.id ?? null
   }, [workspaceMode, activeInspectReadyItem, singleSelectedReadyItem])
 
+  // History timeline for the direct edit target (shown in the left panel)
+  const directTimeline = useMemo(
+    () => (directEditTargetId ? getTimeline(directEditTargetId) : undefined),
+    [directEditTargetId, getTimeline],
+  )
+
   const isDirectEditEnabled = directEditTargetId !== null
   const isMultiSelectDisabled = workspaceMode === 'browse' && selectedReadyItems.length >= 2
 
@@ -186,7 +199,8 @@ export function BorderToolPage() {
   }, [activeItemId, items, workspaceMode])
 
   // --- Direct edit handlers ---
-  const patchDirectTarget = useCallback(
+  // Commit: records a history entry (discrete controls, gesture ends)
+  const commitDirectTarget = useCallback(
     (patch: Partial<ImageEditRecipe>) => {
       if (directEditTargetId) {
         patchImage(directEditTargetId, patch)
@@ -195,68 +209,148 @@ export function BorderToolPage() {
     [directEditTargetId, patchImage],
   )
 
+  // Live: transient preview update, no history (mid-gesture)
+  const livePatchDirectTarget = useCallback(
+    (patch: Partial<ImageEditRecipe>) => {
+      if (directEditTargetId) {
+        patchImageLive(directEditTargetId, patch)
+      }
+    },
+    [directEditTargetId, patchImageLive],
+  )
+
   const handlePresetIdChange = useCallback(
     (presetId: ImageEditRecipe['presetId']) => {
-      patchDirectTarget({ presetId })
+      commitDirectTarget({ presetId })
     },
-    [patchDirectTarget],
+    [commitDirectTarget],
   )
 
   const handleBackgroundColorChange = useCallback(
     (backgroundColor: string) => {
-      patchDirectTarget({ backgroundColor })
+      livePatchDirectTarget({ backgroundColor })
     },
-    [patchDirectTarget],
+    [livePatchDirectTarget],
+  )
+
+  const handleBackgroundColorCommit = useCallback(
+    (backgroundColor: string) => {
+      commitDirectTarget({ backgroundColor })
+    },
+    [commitDirectTarget],
   )
 
   const handleImageSizingModeChange = useCallback(
     (imageSizingMode: ImageEditRecipe['imageSizingMode']) => {
-      patchDirectTarget({ imageSizingMode })
+      commitDirectTarget({ imageSizingMode })
     },
-    [patchDirectTarget],
+    [commitDirectTarget],
   )
 
   const handleImageEdgePixelsChange = useCallback(
     (imageEdgePixels: number) => {
-      patchDirectTarget({ imageEdgePixels })
+      livePatchDirectTarget({ imageEdgePixels })
     },
-    [patchDirectTarget],
+    [livePatchDirectTarget],
+  )
+
+  const handleImageEdgePixelsCommit = useCallback(
+    (imageEdgePixels: number) => {
+      commitDirectTarget({ imageEdgePixels })
+    },
+    [commitDirectTarget],
   )
 
   const handleBorderWidthPixelsChange = useCallback(
     (borderWidthPixels: number) => {
-      patchDirectTarget({ borderWidthPixels })
+      livePatchDirectTarget({ borderWidthPixels })
     },
-    [patchDirectTarget],
+    [livePatchDirectTarget],
+  )
+
+  const handleBorderWidthPixelsCommit = useCallback(
+    (borderWidthPixels: number) => {
+      commitDirectTarget({ borderWidthPixels })
+    },
+    [commitDirectTarget],
   )
 
   const handleMinVerticalPaddingPixelsChange = useCallback(
     (minVerticalPaddingPixels: number) => {
-      patchDirectTarget({ minVerticalPaddingPixels })
+      livePatchDirectTarget({ minVerticalPaddingPixels })
     },
-    [patchDirectTarget],
+    [livePatchDirectTarget],
+  )
+
+  const handleMinVerticalPaddingPixelsCommit = useCallback(
+    (minVerticalPaddingPixels: number) => {
+      commitDirectTarget({ minVerticalPaddingPixels })
+    },
+    [commitDirectTarget],
   )
 
   const handleCustomWidthChange = useCallback(
     (customWidth: number) => {
-      patchDirectTarget({ customWidth })
+      livePatchDirectTarget({ customWidth })
     },
-    [patchDirectTarget],
+    [livePatchDirectTarget],
+  )
+
+  const handleCustomWidthCommit = useCallback(
+    (customWidth: number) => {
+      commitDirectTarget({ customWidth })
+    },
+    [commitDirectTarget],
   )
 
   const handleCustomHeightChange = useCallback(
     (customHeight: number) => {
-      patchDirectTarget({ customHeight })
+      livePatchDirectTarget({ customHeight })
     },
-    [patchDirectTarget],
+    [livePatchDirectTarget],
+  )
+
+  const handleCustomHeightCommit = useCallback(
+    (customHeight: number) => {
+      commitDirectTarget({ customHeight })
+    },
+    [commitDirectTarget],
   )
 
   const handleFilterPresetIdChange = useCallback(
     (filterPresetId: ImageEditRecipe['filterPresetId']) => {
-      patchDirectTarget({ filterPresetId })
+      commitDirectTarget({ filterPresetId })
     },
-    [patchDirectTarget],
+    [commitDirectTarget],
   )
+
+  // --- History navigation ---
+  const handleUndo = useCallback(() => {
+    if (directEditTargetId) {
+      undo(directEditTargetId)
+    }
+  }, [directEditTargetId, undo])
+
+  const handleRedo = useCallback(() => {
+    if (directEditTargetId) {
+      redo(directEditTargetId)
+    }
+  }, [directEditTargetId, redo])
+
+  const handleJump = useCallback(
+    (index: number) => {
+      if (directEditTargetId) {
+        jumpToIndex(directEditTargetId, index)
+      }
+    },
+    [directEditTargetId, jumpToIndex],
+  )
+
+  useUndoRedoShortcuts({
+    targetId: directEditTargetId,
+    onUndo: handleUndo,
+    onRedo: handleRedo,
+  })
 
   // --- Batch apply via card context menu ---
   const handleApplySourceToSelected = useCallback(
@@ -266,7 +360,11 @@ export function BorderToolPage() {
         .filter((item) => item.id !== sourceId)
         .map((item) => item.id)
       if (targetIds.length > 0) {
-        replaceImagesWithRecipe(targetIds, sourceRecipe)
+        replaceImagesWithRecipe(
+          targetIds,
+          sourceRecipe,
+          `Apply preset to ${targetIds.length} image${targetIds.length > 1 ? 's' : ''}`,
+        )
       }
     },
     [getRecipe, selectedReadyItems, replaceImagesWithRecipe],
@@ -555,6 +653,8 @@ export function BorderToolPage() {
           customHeight={directRecipe.customHeight}
           onCustomWidthChange={handleCustomWidthChange}
           onCustomHeightChange={handleCustomHeightChange}
+          onCustomWidthCommit={handleCustomWidthCommit}
+          onCustomHeightCommit={handleCustomHeightCommit}
           disabled={!isDirectEditEnabled}
         />
       </SidebarSection>
@@ -567,10 +667,14 @@ export function BorderToolPage() {
           borderWidthPixels={directRecipe.borderWidthPixels}
           minVerticalPaddingPixels={directRecipe.minVerticalPaddingPixels}
           onBackgroundColorChange={handleBackgroundColorChange}
+          onBackgroundColorCommit={handleBackgroundColorCommit}
           onImageSizingModeChange={handleImageSizingModeChange}
           onImageEdgePixelsChange={handleImageEdgePixelsChange}
+          onImageEdgePixelsCommit={handleImageEdgePixelsCommit}
           onBorderWidthPixelsChange={handleBorderWidthPixelsChange}
+          onBorderWidthPixelsCommit={handleBorderWidthPixelsCommit}
           onMinVerticalPaddingPixelsChange={handleMinVerticalPaddingPixelsChange}
+          onMinVerticalPaddingPixelsCommit={handleMinVerticalPaddingPixelsCommit}
           disabled={!isDirectEditEnabled}
         />
       </SidebarSection>
@@ -597,8 +701,15 @@ export function BorderToolPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1">
-        <aside className="hidden w-60 shrink-0 overflow-y-auto border-r border-border bg-surface p-3 md:block">
-          {leftPanelContent}
+        <aside className="hidden w-60 shrink-0 flex-col border-r border-border bg-surface md:flex">
+          <div className="min-h-0 flex-1 overflow-y-auto p-3">{leftPanelContent}</div>
+          <HistoryPanel
+            timeline={directTimeline}
+            onUndo={handleUndo}
+            onRedo={handleRedo}
+            onJump={handleJump}
+            className="shrink-0 border-t border-border p-3"
+          />
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background p-4">
@@ -635,7 +746,7 @@ export function BorderToolPage() {
               />
             </div>
           ) : workspaceMode === 'browse' ? (
-            <div className="flex flex-1 min-h-0 overflow-y-auto">
+            <div className="scrollbar-hover flex flex-1 min-h-0 overflow-y-auto">
               <BrowseWorkspace
                 items={items}
                 getItemRecipe={getItemRecipe}
@@ -678,8 +789,15 @@ export function BorderToolPage() {
             aria-hidden="true"
           />
           {mobilePanel === 'left' ? (
-            <div className="sidebar-panel sidebar-left p-3">
-              {leftPanelContent}
+            <div className="sidebar-panel sidebar-left flex flex-col p-3">
+              <div className="min-h-0 flex-1 overflow-y-auto">{leftPanelContent}</div>
+              <HistoryPanel
+                timeline={directTimeline}
+                onUndo={handleUndo}
+                onRedo={handleRedo}
+                onJump={handleJump}
+                className="shrink-0 border-t border-border pt-3"
+              />
             </div>
           ) : null}
           {mobilePanel === 'right' ? (
