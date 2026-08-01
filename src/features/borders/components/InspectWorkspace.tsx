@@ -41,7 +41,7 @@ export function InspectWorkspace({
       className={
         isFitZoom
           ? 'flex flex-1 min-h-0 items-center justify-center overflow-hidden rounded-lg bg-surface-muted'
-          : 'flex flex-1 min-h-0 overflow-auto rounded-lg bg-surface-muted'
+          : 'scrollbar-hover flex flex-1 min-h-0 overflow-auto rounded-lg bg-surface-muted'
       }
     >
       <div

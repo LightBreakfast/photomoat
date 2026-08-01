@@ -33,6 +33,25 @@ export type ImageEditRecipe = {
   filterPresetId: FilterPresetId
 }
 
+export type EditHistoryEntry = {
+  recipe: ImageEditRecipe
+  label: string
+  timestamp: number
+}
+
+export type ImageHistory = {
+  past: EditHistoryEntry[]
+  present: EditHistoryEntry
+  future: EditHistoryEntry[]
+  /** Transient live overlay during a gesture (drag/typing). Never part of history. */
+  working?: Partial<ImageEditRecipe>
+}
+
+export type EditTimeline = {
+  entries: EditHistoryEntry[]
+  currentIndex: number
+}
+
 export type ExportSettings = {
   outputFormat: ExportFormat
   jpegQuality: number

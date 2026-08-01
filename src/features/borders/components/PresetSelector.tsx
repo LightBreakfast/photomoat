@@ -25,6 +25,8 @@ type PresetSelectorProps = {
   customHeight?: number
   onCustomWidthChange?: (width: number) => void
   onCustomHeightChange?: (height: number) => void
+  onCustomWidthCommit?: (width: number) => void
+  onCustomHeightCommit?: (height: number) => void
   disabled?: boolean
 }
 
@@ -80,6 +82,8 @@ export function PresetSelector({
   customHeight = 1080,
   onCustomWidthChange,
   onCustomHeightChange,
+  onCustomWidthCommit,
+  onCustomHeightCommit,
   disabled = false,
 }: PresetSelectorProps) {
   const selectedPreset = instagramPresets.find((preset) => preset.id === selectedPresetId)
@@ -170,6 +174,7 @@ export function PresetSelector({
                 min={customSizeMin}
                 max={customSizeMax}
                 onChange={onCustomWidthChange}
+                onCommit={onCustomWidthCommit}
                 ariaLabel="Custom width in pixels"
                 disabled={disabled}
               />
@@ -180,6 +185,7 @@ export function PresetSelector({
                 min={customSizeMin}
                 max={customSizeMax}
                 onChange={onCustomHeightChange}
+                onCommit={onCustomHeightCommit}
                 ariaLabel="Custom height in pixels"
                 disabled={disabled}
               />

@@ -173,6 +173,97 @@ describe('ScrubberInput', () => {
     fireEvent.mouseUp(document)
   })
 
+  it('fires onCommit with the final value on mouseup after a drag', () => {
+    const onChange = vi.fn()
+    const onCommit = vi.fn()
+
+    render(
+      <ScrubberInput
+        label="Width (px)"
+        value={1080}
+        step={1}
+        onChange={onChange}
+        onCommit={onCommit}
+        ariaLabel="Width in pixels"
+      />,
+    )
+
+    const label = screen.getByText('Width (px)')
+    fireEvent.mouseDown(label, { clientX: 100 })
+    fireEvent.mouseMove(document, { clientX: 150 })
+    fireEvent.mouseMove(document, { clientX: 170 })
+
+    expect(onChange).toHaveBeenLastCalledWith(1150)
+    expect(onCommit).not.toHaveBeenCalled()
+
+    fireEvent.mouseUp(document)
+    expect(onCommit).toHaveBeenCalledTimes(1)
+    expect(onCommit).toHaveBeenCalledWith(1150)
+  })
+
+  it('fires onCommit with the start value when released without moving', () => {
+    const onCommit = vi.fn()
+
+    render(
+      <ScrubberInput
+        label="Width (px)"
+        value={1080}
+        onChange={vi.fn()}
+        onCommit={onCommit}
+        ariaLabel="Width in pixels"
+      />,
+    )
+
+    fireEvent.mouseDown(screen.getByText('Width (px)'), { clientX: 100 })
+    fireEvent.mouseUp(document)
+
+    expect(onCommit).toHaveBeenCalledWith(1080)
+  })
+
+  it('fires onCommit with the typed value on blur', () => {
+    const onChange = vi.fn()
+    const onCommit = vi.fn()
+
+    render(
+      <ScrubberInput
+        label="Width (px)"
+        value={1080}
+        onChange={onChange}
+        onCommit={onCommit}
+        ariaLabel="Width in pixels"
+      />,
+    )
+
+    const input = screen.getByLabelText('Width in pixels')
+    fireEvent.change(input, { target: { value: '1920' } })
+    fireEvent.blur(input)
+
+    expect(onChange).toHaveBeenCalledWith(1920)
+    expect(onCommit).toHaveBeenCalledTimes(1)
+    expect(onCommit).toHaveBeenCalledWith(1920)
+  })
+
+  it('fires onCommit with the typed value on Enter', () => {
+    const onCommit = vi.fn()
+
+    render(
+      <ScrubberInput
+        label="Width (px)"
+        value={1080}
+        onChange={vi.fn()}
+        onCommit={onCommit}
+        ariaLabel="Width in pixels"
+      />,
+    )
+
+    const input = screen.getByLabelText('Width in pixels')
+    fireEvent.change(input, { target: { value: '640' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(onCommit).toHaveBeenCalledTimes(1)
+    expect(onCommit).toHaveBeenCalledWith(640)
+  })
+
   it('renders a disabled input when disabled', () => {
     const onChange = vi.fn()
 

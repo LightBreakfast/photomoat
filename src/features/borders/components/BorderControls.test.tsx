@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -124,6 +125,152 @@ describe('BorderControls', () => {
     expect(screen.queryByLabelText(/target edge size in pixels/i)).not.toBeInTheDocument()
     expect(screen.queryByLabelText(/horizontal padding in pixels/i)).not.toBeInTheDocument()
     expect(screen.getByLabelText(/image sizing mode/i)).toBeInTheDocument()
+  })
+
+  it('fires background commit on swatch click', () => {
+    const onBackgroundColorChange = vi.fn()
+    const onBackgroundColorCommit = vi.fn()
+
+    render(
+      <BorderControls
+        backgroundColor="#ffffff"
+        imageSizingMode="contain"
+        imageEdgePixels={900}
+        borderWidthPixels={90}
+        minVerticalPaddingPixels={90}
+        onBackgroundColorChange={onBackgroundColorChange}
+        onBackgroundColorCommit={onBackgroundColorCommit}
+        onImageSizingModeChange={vi.fn()}
+        onImageEdgePixelsChange={vi.fn()}
+        onBorderWidthPixelsChange={vi.fn()}
+        onMinVerticalPaddingPixelsChange={vi.fn()}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use #000000 background' }))
+
+    expect(onBackgroundColorChange).toHaveBeenCalledWith('#000000')
+    expect(onBackgroundColorCommit).toHaveBeenCalledTimes(1)
+    expect(onBackgroundColorCommit).toHaveBeenCalledWith('#000000')
+  })
+
+  it('fires background commit on blur of the hex field only', () => {
+    const onBackgroundColorCommit = vi.fn()
+
+    function Harness() {
+      const [backgroundColor, setBackgroundColor] = useState('#ffffff')
+      return (
+        <BorderControls
+          backgroundColor={backgroundColor}
+          imageSizingMode="contain"
+          imageEdgePixels={900}
+          borderWidthPixels={90}
+          minVerticalPaddingPixels={90}
+          onBackgroundColorChange={setBackgroundColor}
+          onBackgroundColorCommit={onBackgroundColorCommit}
+          onImageSizingModeChange={vi.fn()}
+          onImageEdgePixelsChange={vi.fn()}
+          onBorderWidthPixelsChange={vi.fn()}
+          onMinVerticalPaddingPixelsChange={vi.fn()}
+        />
+      )
+    }
+
+    render(<Harness />)
+
+    const input = screen.getByLabelText(/background colour hex value/i)
+    fireEvent.change(input, { target: { value: '#eeeeee' } })
+    expect(onBackgroundColorCommit).not.toHaveBeenCalled()
+
+    fireEvent.blur(input)
+    expect(onBackgroundColorCommit).toHaveBeenCalledTimes(1)
+    expect(onBackgroundColorCommit).toHaveBeenCalledWith('#eeeeee')
+  })
+
+  it('commits edge pixel changes on gesture end', () => {
+    const onImageEdgePixelsChange = vi.fn()
+    const onImageEdgePixelsCommit = vi.fn()
+
+    render(
+      <BorderControls
+        backgroundColor="#ffffff"
+        imageSizingMode="long-edge"
+        imageEdgePixels={900}
+        borderWidthPixels={90}
+        minVerticalPaddingPixels={90}
+        onBackgroundColorChange={vi.fn()}
+        onImageSizingModeChange={vi.fn()}
+        onImageEdgePixelsChange={onImageEdgePixelsChange}
+        onImageEdgePixelsCommit={onImageEdgePixelsCommit}
+        onBorderWidthPixelsChange={vi.fn()}
+        onMinVerticalPaddingPixelsChange={vi.fn()}
+      />,
+    )
+
+    fireEvent.mouseDown(screen.getByText('Pixels'), { clientX: 100 })
+    fireEvent.mouseMove(document, { clientX: 120 })
+
+    expect(onImageEdgePixelsChange).toHaveBeenCalledWith(920)
+    expect(onImageEdgePixelsCommit).not.toHaveBeenCalled()
+
+    fireEvent.mouseUp(document)
+    expect(onImageEdgePixelsCommit).toHaveBeenCalledTimes(1)
+    expect(onImageEdgePixelsCommit).toHaveBeenCalledWith(920)
+  })
+
+  it('commits border width changes on Enter', () => {
+    const onBorderWidthPixelsChange = vi.fn()
+    const onBorderWidthPixelsCommit = vi.fn()
+
+    render(
+      <BorderControls
+        backgroundColor="#ffffff"
+        imageSizingMode="border-width"
+        imageEdgePixels={900}
+        borderWidthPixels={90}
+        minVerticalPaddingPixels={90}
+        onBackgroundColorChange={vi.fn()}
+        onImageSizingModeChange={vi.fn()}
+        onImageEdgePixelsChange={vi.fn()}
+        onBorderWidthPixelsChange={onBorderWidthPixelsChange}
+        onBorderWidthPixelsCommit={onBorderWidthPixelsCommit}
+        onMinVerticalPaddingPixelsChange={vi.fn()}
+      />,
+    )
+
+    const input = screen.getByLabelText(/horizontal padding in pixels/i)
+    fireEvent.change(input, { target: { value: '72' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(onBorderWidthPixelsCommit).toHaveBeenCalledTimes(1)
+    expect(onBorderWidthPixelsCommit).toHaveBeenCalledWith(72)
+  })
+
+  it('commits vertical padding changes on Enter', () => {
+    const onMinVerticalPaddingPixelsCommit = vi.fn()
+
+    render(
+      <BorderControls
+        backgroundColor="#ffffff"
+        imageSizingMode="fixed-sides"
+        imageEdgePixels={900}
+        borderWidthPixels={90}
+        minVerticalPaddingPixels={60}
+        onBackgroundColorChange={vi.fn()}
+        onImageSizingModeChange={vi.fn()}
+        onImageEdgePixelsChange={vi.fn()}
+        onBorderWidthPixelsChange={vi.fn()}
+        onMinVerticalPaddingPixelsChange={vi.fn()}
+        onMinVerticalPaddingPixelsCommit={onMinVerticalPaddingPixelsCommit}
+      />,
+    )
+
+    const input = screen.getByLabelText(/minimum vertical padding in pixels/i)
+    fireEvent.change(input, { target: { value: '48' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(onMinVerticalPaddingPixelsCommit).toHaveBeenCalledTimes(1)
+    expect(onMinVerticalPaddingPixelsCommit).toHaveBeenCalledWith(48)
   })
 
   it('does not render extra size inputs when mode is fill', () => {
