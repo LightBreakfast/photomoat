@@ -1,4 +1,5 @@
 import { fireEvent, render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
 import { ImageGrid } from '@/shared/components/ImageGrid'
@@ -15,6 +16,9 @@ const defaultRecipe: ImageEditRecipe = {
   customWidth: 1080,
   customHeight: 1080,
   filterPresetId: 'original',
+  rotationDegrees: 0,
+  flipHorizontal: false,
+  flipVertical: false,
 }
 
 const defaultFilterAdjustments = {
@@ -157,3 +161,67 @@ describe('ImageGrid', () => {
     expect(onToggleSelect).toHaveBeenCalledWith('1', expect.objectContaining({ metaKey: false, ctrlKey: false }))
   })
 })
+
+describe('ImageGrid context menu', () => {
+  it('opens the card context menu and fires a per-card transform action', async () => {
+    const onRotate = vi.fn()
+
+    render(
+      <ImageGrid
+        items={[{ ...item, status: 'ready', error: undefined }]}
+        getItemRecipe={getItemRecipe}
+        getItemFilterAdjustments={getItemFilterAdjustments}
+        getItemMenuActions={() => [
+          {
+            label: 'Transform',
+            items: [
+              { label: 'Rotate 90° CW', onClick: onRotate },
+              { label: 'Flip horizontal', onClick: vi.fn() },
+            ],
+          },
+        ]}
+        onRemove={vi.fn()}
+        onDownload={vi.fn()}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: /more actions for portrait/i }))
+    await userEvent.click(await screen.findByRole('menuitem', { name: 'Rotate 90° CW' }))
+
+    expect(onRotate).toHaveBeenCalledTimes(1)
+  })
+
+  it('shows flip state as checked menu items and fires on toggle', async () => {
+    const onFlipVertical = vi.fn()
+
+    render(
+      <ImageGrid
+        items={[{ ...item, status: 'ready', error: undefined }]}
+        getItemRecipe={getItemRecipe}
+        getItemFilterAdjustments={getItemFilterAdjustments}
+        getItemMenuActions={() => [
+          {
+            label: 'Transform',
+            items: [
+              { label: 'Flip horizontal', checked: true, onClick: vi.fn() },
+              { label: 'Flip vertical', checked: false, onClick: onFlipVertical },
+            ],
+          },
+        ]}
+        onRemove={vi.fn()}
+        onDownload={vi.fn()}
+      />,
+    )
+
+    await userEvent.click(screen.getByRole('button', { name: /more actions for portrait/i }))
+
+    const flipHorizontal = await screen.findByRole('menuitemcheckbox', { name: 'Flip horizontal' })
+    const flipVertical = screen.getByRole('menuitemcheckbox', { name: 'Flip vertical' })
+    expect(flipHorizontal).toHaveAttribute('aria-checked', 'true')
+    expect(flipVertical).toHaveAttribute('aria-checked', 'false')
+
+    await userEvent.click(flipVertical)
+    expect(onFlipVertical).toHaveBeenCalledTimes(1)
+  })
+})
+

@@ -17,6 +17,13 @@ type ImageEditsAction =
   | { type: 'commit-patch'; imageId: string; patch: Partial<ImageEditRecipe>; label?: string }
   | { type: 'commit-replace'; imageId: string; recipe: ImageEditRecipe; label?: string }
   | { type: 'commit-replace-many'; imageIds: string[]; recipe: ImageEditRecipe; label?: string }
+  | {
+      type: 'commit-patch-many'
+      imageIds: string[]
+      /** Static patch, or a per-image patch derived from that image's current recipe. */
+      patch: Partial<ImageEditRecipe> | ((recipe: ImageEditRecipe) => Partial<ImageEditRecipe>)
+      label?: string
+    }
   | { type: 'live-patch'; imageId: string; patch: Partial<ImageEditRecipe> }
   | { type: 'undo'; imageId: string }
   | { type: 'redo'; imageId: string }
@@ -44,7 +51,10 @@ function recipesEqual(a: ImageEditRecipe, b: ImageEditRecipe): boolean {
     a.minVerticalPaddingPixels === b.minVerticalPaddingPixels &&
     a.customWidth === b.customWidth &&
     a.customHeight === b.customHeight &&
-    a.filterPresetId === b.filterPresetId
+    a.filterPresetId === b.filterPresetId &&
+    a.rotationDegrees === b.rotationDegrees &&
+    a.flipHorizontal === b.flipHorizontal &&
+    a.flipVertical === b.flipVertical
   )
 }
 
@@ -152,6 +162,34 @@ function reducer(state: ImageEditsState, action: ImageEditsAction): ImageEditsSt
           history,
           action.recipe,
           action.label ?? describeRecipe(action.recipe),
+        )
+        if (updated !== history) {
+          next[id] = updated
+          changed = true
+        }
+      }
+
+      return changed ? { byId: next } : state
+    }
+
+    case 'commit-patch-many': {
+      let changed = false
+      const next = { ...state.byId }
+
+      for (const id of action.imageIds) {
+        const history = next[id]
+        if (!history) {
+          continue
+        }
+        const patch =
+          typeof action.patch === 'function'
+            ? action.patch(history.present.recipe)
+            : action.patch
+        const recipe = { ...history.present.recipe, ...patch }
+        const updated = commitRecipe(
+          history,
+          recipe,
+          action.label ?? describeChange(patch),
         )
         if (updated !== history) {
           next[id] = updated
@@ -286,6 +324,17 @@ export function useImageEdits(initialRecipe: ImageEditRecipe) {
     dispatch({ type: 'live-patch', imageId, patch })
   }, [])
 
+  const patchImages = useCallback(
+    (
+      imageIds: string[],
+      patch: Partial<ImageEditRecipe> | ((recipe: ImageEditRecipe) => Partial<ImageEditRecipe>),
+      label?: string,
+    ) => {
+      dispatch({ type: 'commit-patch-many', imageIds, patch, label })
+    },
+    [],
+  )
+
   const replaceImageRecipe = useCallback(
     (imageId: string, recipe: ImageEditRecipe, label?: string) => {
       dispatch({ type: 'commit-replace', imageId, recipe, label })
@@ -346,6 +395,7 @@ export function useImageEdits(initialRecipe: ImageEditRecipe) {
     removeImages,
     patchImage,
     patchImageLive,
+    patchImages,
     replaceImageRecipe,
     replaceImagesWithRecipe,
     undo,

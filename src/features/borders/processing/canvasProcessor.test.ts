@@ -1,9 +1,10 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { resolveFilterAdjustments } from '@/features/borders/filterPresets'
 import {
   calculateContainRect,
   calculateImagePlacementRect,
+  computeSourceTransform,
   drawImageOnCanvas,
   getPreviewCanvasSize,
 } from '@/features/borders/processing/canvasProcessor'
@@ -566,5 +567,225 @@ describe('drawImageOnCanvas filters', () => {
       'draw:none',
     ])
     expect(context.filter).toBe('none')
+  })
+})
+
+describe('computeSourceTransform', () => {
+  it('returns null when no transform is needed', () => {
+    expect(computeSourceTransform(1600, 900)).toBeNull()
+    expect(computeSourceTransform(1600, 900, { rotationDegrees: 0 })).toBeNull()
+    expect(
+      computeSourceTransform(1600, 900, { flipHorizontal: false, flipVertical: false }),
+    ).toBeNull()
+  })
+
+  it('swaps dimensions and maps corners for a 90° clockwise rotation', () => {
+    expect(computeSourceTransform(1600, 900, { rotationDegrees: 90 })).toEqual({
+      width: 900,
+      height: 1600,
+      a: 0,
+      b: 1,
+      c: -1,
+      d: 0,
+      e: 450,
+      f: 800,
+    })
+  })
+
+  it('keeps dimensions for a 180° rotation', () => {
+    expect(computeSourceTransform(1600, 900, { rotationDegrees: 180 })).toEqual({
+      width: 1600,
+      height: 900,
+      a: -1,
+      b: 0,
+      c: 0,
+      d: -1,
+      e: 800,
+      f: 450,
+    })
+  })
+
+  it('swaps dimensions for a 270° rotation (counter-clockwise)', () => {
+    expect(computeSourceTransform(1600, 900, { rotationDegrees: 270 })).toEqual({
+      width: 900,
+      height: 1600,
+      a: 0,
+      b: -1,
+      c: 1,
+      d: 0,
+      e: 450,
+      f: 800,
+    })
+  })
+
+  it('normalizes angles outside 0–360', () => {
+    expect(computeSourceTransform(1600, 900, { rotationDegrees: 450 })?.width).toBe(900)
+    expect(computeSourceTransform(1600, 900, { rotationDegrees: -90 })?.width).toBe(900)
+    expect(computeSourceTransform(1600, 900, { rotationDegrees: 360 })).toBeNull()
+  })
+
+  it('mirrors without rotation', () => {
+    expect(computeSourceTransform(1600, 900, { flipHorizontal: true })).toEqual({
+      width: 1600,
+      height: 900,
+      a: -1,
+      b: 0,
+      c: 0,
+      d: 1,
+      e: 800,
+      f: 450,
+    })
+    expect(computeSourceTransform(1600, 900, { flipVertical: true })).toEqual({
+      width: 1600,
+      height: 900,
+      a: 1,
+      b: 0,
+      c: 0,
+      d: -1,
+      e: 800,
+      f: 450,
+    })
+  })
+
+  it('applies flips after rotation (view space)', () => {
+    // Rotate 90° CW then flip horizontal: F·R = [[0,1],[1,0]]
+    expect(
+      computeSourceTransform(1600, 900, { rotationDegrees: 90, flipHorizontal: true }),
+    ).toEqual({
+      width: 900,
+      height: 1600,
+      a: 0,
+      b: 1,
+      c: 1,
+      d: 0,
+      e: 450,
+      f: 800,
+    })
+    // Rotate 90° CW then flip vertical: F·R = [[0,-1],[-1,0]]
+    expect(
+      computeSourceTransform(1600, 900, { rotationDegrees: 90, flipVertical: true }),
+    ).toEqual({
+      width: 900,
+      height: 1600,
+      a: 0,
+      b: -1,
+      c: -1,
+      d: 0,
+      e: 450,
+      f: 800,
+    })
+  })
+
+  it('computes a bounding box for arbitrary angles', () => {
+    const transform = computeSourceTransform(1000, 600, { rotationDegrees: 45 })
+    expect(transform?.width).toBe(1131)
+    expect(transform?.height).toBe(1131)
+  })
+})
+
+describe('drawImageOnCanvas with source transforms', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function createContext(calls: string[]) {
+    return {
+      canvas: { width: 0, height: 0 },
+      fillStyle: '',
+      filter: 'none',
+      fillRect: vi.fn(() => calls.push('fillRect')),
+      setTransform: vi.fn(
+        (
+          a: number,
+          b: number,
+          c: number,
+          d: number,
+          e: number,
+          f: number,
+        ) => calls.push(`setTransform:${a},${b},${c},${d},${e},${f}`),
+      ),
+      drawImage: vi.fn((_source: unknown, x: number, y: number, width?: number, height?: number) => {
+        calls.push(`draw:${x},${y},${width ?? ''},${height ?? ''}`)
+      }),
+    } as unknown as CanvasRenderingContext2D
+  }
+
+  it('composes the rotated source directly into the destination context', () => {
+    const calls: string[] = []
+    const context = createContext(calls)
+
+    const image = { width: 1600, height: 900 } as CanvasImageSource & {
+      width: number
+      height: number
+    }
+
+    drawImageOnCanvas({
+      context,
+      image,
+      targetWidth: 1080,
+      targetHeight: 1080,
+      backgroundColor: '#ffffff',
+      sizingMode: 'contain',
+      rotationDegrees: 90,
+    })
+
+    // Rotated source is 900x1600; contain in 1080x1080 → scale 0.675.
+    // The composite matrix maps the original source into the placement rect
+    // (236.25, 0, 607.5, 1080) without an intermediate canvas.
+    expect(calls).toEqual([
+      'fillRect',
+      'setTransform:0,0.675,-0.675,0,540,540',
+      'draw:-800,-450,,' ,
+    ])
+  })
+
+  it('flips the source in view space before placement', () => {
+    const calls: string[] = []
+    const context = createContext(calls)
+
+    const image = { width: 1600, height: 900 } as CanvasImageSource & {
+      width: number
+      height: number
+    }
+
+    drawImageOnCanvas({
+      context,
+      image,
+      targetWidth: 1080,
+      targetHeight: 1080,
+      backgroundColor: '#ffffff',
+      sizingMode: 'contain',
+      flipHorizontal: true,
+    })
+
+    expect(calls).toEqual([
+      'fillRect',
+      'setTransform:-0.675,0,0,0.675,540,540',
+      'draw:-800,-450,,' ,
+    ])
+  })
+
+  it('never allocates an intermediate canvas for a transformed draw', () => {
+    const createElementSpy = vi.spyOn(document, 'createElement')
+    const context = createContext([])
+
+    const image = { width: 1600, height: 900 } as CanvasImageSource & {
+      width: number
+      height: number
+    }
+
+    drawImageOnCanvas({
+      context,
+      image,
+      targetWidth: 1080,
+      targetHeight: 1080,
+      backgroundColor: '#ffffff',
+      sizingMode: 'contain',
+      rotationDegrees: 90,
+      flipHorizontal: true,
+      flipVertical: true,
+    })
+
+    expect(createElementSpy).not.toHaveBeenCalled()
   })
 })

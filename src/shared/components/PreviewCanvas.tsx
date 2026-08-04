@@ -14,6 +14,9 @@ type PreviewCanvasProps = {
   borderWidthPixels: number
   minVerticalPaddingPixels: number
   filterAdjustments?: FilterAdjustments
+  rotationDegrees?: number
+  flipHorizontal?: boolean
+  flipVertical?: boolean
   label: string
   fullSize?: boolean
   zoomPercent?: number
@@ -43,6 +46,9 @@ export function PreviewCanvas({
   borderWidthPixels,
   minVerticalPaddingPixels,
   filterAdjustments,
+  rotationDegrees = 0,
+  flipHorizontal = false,
+  flipVertical = false,
   label,
   fullSize = false,
   zoomPercent,
@@ -110,6 +116,9 @@ export function PreviewCanvas({
           borderWidthPixels: scalePreviewPixels(borderWidthPixels, scale),
           minVerticalPaddingPixels: scalePreviewPixels(minVerticalPaddingPixels, scale),
           filterAdjustments,
+          rotationDegrees,
+          flipHorizontal,
+          flipVertical,
         })
         setHasError(false)
       } catch {
@@ -136,6 +145,9 @@ export function PreviewCanvas({
     preset.width,
     sizingMode,
     sourceUrl,
+    rotationDegrees,
+    flipHorizontal,
+    flipVertical,
   ])
 
   if (hasError) {

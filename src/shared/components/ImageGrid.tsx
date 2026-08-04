@@ -62,6 +62,9 @@ export function ImageGrid({
             borderWidthPixels={recipe.borderWidthPixels}
             minVerticalPaddingPixels={recipe.minVerticalPaddingPixels}
             filterAdjustments={filterAdjustments}
+            rotationDegrees={recipe.rotationDegrees}
+            flipHorizontal={recipe.flipHorizontal}
+            flipVertical={recipe.flipVertical}
             isDownloading={activeDownloadId === item.id}
             isSelected={selectedIds?.has(item.id)}
             menuActions={menuActions}
