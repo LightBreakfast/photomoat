@@ -5,17 +5,30 @@ import { PreviewCanvas } from '@/shared/components/PreviewCanvas'
 import { Tooltip } from '@/shared/components/Tooltip'
 import {
   DropdownMenu,
+  DropdownMenuCheckboxItem,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-export type CardMenuAction = {
+export type CardMenuItem = {
   label: string
   icon?: React.ReactNode
   disabled?: boolean
+  /** When set, renders as a checkbox item so toggle state is visible (e.g. flips). */
+  checked?: boolean
   onClick: () => void
 }
+
+export type CardMenuSection = {
+  label: string
+  items: CardMenuItem[]
+}
+
+export type CardMenuAction = CardMenuSection | CardMenuItem | { type: 'separator' }
 
 type ImageCardProps = {
   item: ImageQueueItem
@@ -26,6 +39,9 @@ type ImageCardProps = {
   borderWidthPixels: number
   minVerticalPaddingPixels: number
   filterAdjustments?: FilterAdjustments
+  rotationDegrees?: number
+  flipHorizontal?: boolean
+  flipVertical?: boolean
   isDownloading?: boolean
   isSelected?: boolean
   menuActions?: CardMenuAction[]
@@ -44,6 +60,9 @@ export function ImageCard({
   borderWidthPixels,
   minVerticalPaddingPixels,
   filterAdjustments,
+  rotationDegrees = 0,
+  flipHorizontal = false,
+  flipVertical = false,
   isDownloading = false,
   isSelected = false,
   menuActions,
@@ -92,6 +111,9 @@ export function ImageCard({
                 borderWidthPixels={borderWidthPixels}
                 minVerticalPaddingPixels={minVerticalPaddingPixels}
                 filterAdjustments={filterAdjustments}
+                rotationDegrees={rotationDegrees}
+                flipHorizontal={flipHorizontal}
+                flipVertical={flipVertical}
                 label={`Preview for ${item.filename}`}
               />
             </div>
@@ -136,7 +158,7 @@ export function ImageCard({
                 </button>
               ) : null}
 
-              {/* Context menu */}
+              {/* Context menu (transform + selection actions) */}
               {hasMenuActions ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger
@@ -154,16 +176,52 @@ export function ImageCard({
                     <MoreHorizontal size={14} />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent side="bottom" align="end" sideOffset={4}>
-                    {menuActions.map((action, index) => (
-                      <DropdownMenuItem
-                        key={index}
-                        disabled={action.disabled}
-                        onClick={action.onClick}
-                      >
-                        {action.icon}
-                        {action.label}
-                      </DropdownMenuItem>
-                    ))}
+                    {menuActions.map((action, index) => {
+                      if ('type' in action) {
+                        return <DropdownMenuSeparator key={index} />
+                      }
+                      if ('items' in action) {
+                        return (
+                          <DropdownMenuGroup key={index}>
+                            <DropdownMenuLabel>{action.label}</DropdownMenuLabel>
+                            {action.items.map((item, itemIndex) => {
+                              if (item.checked !== undefined) {
+                                return (
+                                  <DropdownMenuCheckboxItem
+                                    key={itemIndex}
+                                    checked={item.checked}
+                                    disabled={item.disabled}
+                                    onCheckedChange={() => item.onClick()}
+                                  >
+                                    {item.label}
+                                  </DropdownMenuCheckboxItem>
+                                )
+                              }
+                              return (
+                                <DropdownMenuItem
+                                  key={itemIndex}
+                                  disabled={item.disabled}
+                                  onClick={item.onClick}
+                                >
+                                  {item.icon}
+                                  {item.label}
+                                </DropdownMenuItem>
+                              )
+                            })}
+                          </DropdownMenuGroup>
+                        )
+                      }
+                      return (
+                        <DropdownMenuItem
+                          key={index}
+                          disabled={action.disabled}
+                          onClick={action.onClick}
+                        >
+                          {action.icon}
+                          {action.label}
+                        </DropdownMenuItem>
+                      )
+                    })}
                   </DropdownMenuContent>
                 </DropdownMenu>
               ) : null}

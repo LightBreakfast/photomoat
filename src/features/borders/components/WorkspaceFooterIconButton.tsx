@@ -1,11 +1,20 @@
 import type { LucideIcon } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { Kbd } from '@/components/ui/kbd'
 import { Tooltip } from '@/shared/components/Tooltip'
+
+/** Renders a shortcut hint like `⌘[` on macOS and `Ctrl+[` elsewhere. */
+function formatShortcut(shortcut: string): string {
+  const isMac =
+    typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform)
+  return isMac ? `⌘${shortcut}` : `Ctrl+${shortcut}`
+}
 
 type WorkspaceFooterIconButtonProps = {
   label: string
   icon: LucideIcon
+  shortcut?: string
   onClick?: () => void
   onPointerDown?: () => void
   onPointerUp?: () => void
@@ -18,6 +27,7 @@ type WorkspaceFooterIconButtonProps = {
 export function WorkspaceFooterIconButton({
   label,
   icon: Icon,
+  shortcut,
   onClick,
   onPointerDown,
   onPointerUp,
@@ -27,7 +37,18 @@ export function WorkspaceFooterIconButton({
   pressed,
 }: WorkspaceFooterIconButtonProps) {
   return (
-    <Tooltip label={label}>
+    <Tooltip
+      label={
+        shortcut ? (
+          <>
+            {label}
+            <Kbd>{formatShortcut(shortcut)}</Kbd>
+          </>
+        ) : (
+          label
+        )
+      }
+    >
       <button
         type="button"
         aria-label={label}
@@ -39,7 +60,7 @@ export function WorkspaceFooterIconButton({
         onPointerCancel={onPointerCancel}
         disabled={disabled}
         className={cn(
-          'flex h-8 w-8 items-center justify-center rounded-md border transition-colors',
+          'flex h-8 w-8 shrink-0 items-center justify-center rounded-md border transition-colors',
           disabled && 'cursor-not-allowed opacity-40',
           pressed
             ? 'border-accent bg-surface-muted text-foreground'

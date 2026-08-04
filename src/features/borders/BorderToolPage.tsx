@@ -5,9 +5,13 @@ import {
   ChevronRight,
   Contrast,
   Copy,
+  FlipHorizontal2,
+  FlipVertical2,
   Grid3X3,
   Pencil,
   Package,
+  RotateCcw,
+  RotateCw,
   Square,
 } from 'lucide-react'
 
@@ -60,6 +64,7 @@ export function BorderToolPage() {
     removeImages: removeImageRecipes,
     patchImage,
     patchImageLive,
+    patchImages,
     replaceImagesWithRecipe,
     undo,
     redo,
@@ -324,6 +329,98 @@ export function BorderToolPage() {
     [commitDirectTarget],
   )
 
+  // --- Source transform handlers (rotate / flip) ---
+  const rotateRecipe = (recipe: ImageEditRecipe, direction: 'cw' | 'ccw') => ({
+    rotationDegrees: (recipe.rotationDegrees + (direction === 'cw' ? 90 : 270)) % 360,
+  })
+
+  const rotateLabel = (count: number, direction: 'cw' | 'ccw') =>
+    `${count > 1 ? `Rotate ${count} images` : 'Rotate'} 90° ${direction === 'cw' ? 'CW' : 'CCW'}`
+
+  const handleRotateImage = useCallback(
+    (imageId: string, direction: 'cw' | 'ccw') => {
+      patchImage(imageId, rotateRecipe(getRecipe(imageId), direction), rotateLabel(1, direction))
+    },
+    [getRecipe, patchImage],
+  )
+
+  const handleFlipImage = useCallback(
+    (imageId: string, axis: 'horizontal' | 'vertical') => {
+      const recipe = getRecipe(imageId)
+      patchImage(
+        imageId,
+        axis === 'horizontal'
+          ? { flipHorizontal: !recipe.flipHorizontal }
+          : { flipVertical: !recipe.flipVertical },
+      )
+    },
+    [getRecipe, patchImage],
+  )
+
+  const handleRotateSelected = useCallback(
+    (direction: 'cw' | 'ccw') => {
+      const ids = [...selectedIds]
+      if (ids.length === 0) {
+        return
+      }
+      patchImages(ids, (recipe) => rotateRecipe(recipe, direction), rotateLabel(ids.length, direction))
+    },
+    [selectedIds, patchImages],
+  )
+
+  const handleFlipSelected = useCallback(
+    (axis: 'horizontal' | 'vertical') => {
+      const ids = [...selectedIds]
+      if (ids.length === 0) {
+        return
+      }
+      const label = `Flip ${ids.length > 1 ? `${ids.length} images ` : ''}${axis}`
+      patchImages(
+        ids,
+        (recipe) =>
+          axis === 'horizontal'
+            ? { flipHorizontal: !recipe.flipHorizontal }
+            : { flipVertical: !recipe.flipVertical },
+        label,
+      )
+    },
+    [selectedIds, patchImages],
+  )
+
+  // Rotate shortcuts ([ / ]) — active only in inspect mode where there is a single edit target
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      const target = event.target as HTMLElement | null
+      if (
+        target &&
+        (target.tagName === 'INPUT' ||
+          target.tagName === 'TEXTAREA' ||
+          target.tagName === 'SELECT' ||
+          target.isContentEditable)
+      ) {
+        return
+      }
+      if (workspaceMode !== 'inspect' || !directEditTargetId) {
+        return
+      }
+      // Lightroom convention: Cmd/Ctrl+[ rotate left, Cmd/Ctrl+] rotate right.
+      // Shift/Alt combos are reserved (browser tab switching, future shortcuts).
+      const isCmdOrCtrl = event.metaKey || event.ctrlKey
+      if (!isCmdOrCtrl || event.altKey || event.shiftKey) {
+        return
+      }
+      if (event.key === '[') {
+        event.preventDefault()
+        handleRotateImage(directEditTargetId, 'ccw')
+      } else if (event.key === ']') {
+        event.preventDefault()
+        handleRotateImage(directEditTargetId, 'cw')
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [workspaceMode, directEditTargetId, handleRotateImage])
+
   // --- History navigation ---
   const handleUndo = useCallback(() => {
     if (directEditTargetId) {
@@ -375,20 +472,86 @@ export function BorderToolPage() {
     (id: string): CardMenuAction[] => {
       const isSelected = selectedIds.has(id)
       const hasMultipleSelected = selectedReadyItems.length >= 2
+      const recipe = getRecipe(id)
 
-      if (!hasMultipleSelected || !isSelected) {
-        return []
-      }
-
-      return [
+      // Per-card transform section is always available (rotate / flip this card)
+      const actions: CardMenuAction[] = [
         {
-          label: 'Apply to selected',
-          icon: <Copy size={14} />,
-          onClick: () => handleApplySourceToSelected(id),
+          label: 'Transform',
+          items: [
+            {
+              label: 'Rotate 90° CW',
+              icon: <RotateCw size={14} />,
+              onClick: () => handleRotateImage(id, 'cw'),
+            },
+            {
+              label: 'Rotate 90° CCW',
+              icon: <RotateCcw size={14} />,
+              onClick: () => handleRotateImage(id, 'ccw'),
+            },
+            {
+              label: 'Flip horizontal',
+              checked: recipe.flipHorizontal,
+              onClick: () => handleFlipImage(id, 'horizontal'),
+            },
+            {
+              label: 'Flip vertical',
+              checked: recipe.flipVertical,
+              onClick: () => handleFlipImage(id, 'vertical'),
+            },
+          ],
         },
       ]
+
+      // Batch section only appears when multiple images are selected and this card is one of them
+      if (hasMultipleSelected && isSelected) {
+        actions.push(
+          { type: 'separator' },
+          {
+            label: 'Selection',
+            items: [
+              {
+                label: 'Apply to selected',
+                icon: <Copy size={14} />,
+                onClick: () => handleApplySourceToSelected(id),
+              },
+              {
+                label: 'Rotate selected 90° CW',
+                icon: <RotateCw size={14} />,
+                onClick: () => handleRotateSelected('cw'),
+              },
+              {
+                label: 'Rotate selected 90° CCW',
+                icon: <RotateCcw size={14} />,
+                onClick: () => handleRotateSelected('ccw'),
+              },
+              {
+                label: 'Flip selected horizontal',
+                icon: <FlipHorizontal2 size={14} />,
+                onClick: () => handleFlipSelected('horizontal'),
+              },
+              {
+                label: 'Flip selected vertical',
+                icon: <FlipVertical2 size={14} />,
+                onClick: () => handleFlipSelected('vertical'),
+              },
+            ],
+          },
+        )
+      }
+
+      return actions
     },
-    [selectedIds, selectedReadyItems, handleApplySourceToSelected],
+    [
+      selectedIds,
+      selectedReadyItems,
+      getRecipe,
+      handleApplySourceToSelected,
+      handleRotateSelected,
+      handleFlipSelected,
+      handleRotateImage,
+      handleFlipImage,
+    ],
   )
 
   // --- Per-item recipe resolver for Browse ---
@@ -469,6 +632,9 @@ export function BorderToolPage() {
       borderWidthPixels: recipe.borderWidthPixels,
       minVerticalPaddingPixels: recipe.minVerticalPaddingPixels,
       filterAdjustments,
+      rotationDegrees: recipe.rotationDegrees,
+      flipHorizontal: recipe.flipHorizontal,
+      flipVertical: recipe.flipVertical,
     })
 
     return canvasToBlob(canvas, exportSettings.outputFormat, exportSettings.jpegQuality)
@@ -771,6 +937,9 @@ export function BorderToolPage() {
               borderWidthPixels={directRecipe.borderWidthPixels}
               minVerticalPaddingPixels={directRecipe.minVerticalPaddingPixels}
               filterAdjustments={activeFilterAdjustments}
+              rotationDegrees={directRecipe.rotationDegrees}
+              flipHorizontal={directRecipe.flipHorizontal}
+              flipVertical={directRecipe.flipVertical}
               inspectZoom={inspectZoom}
             />
           )}
@@ -814,7 +983,7 @@ export function BorderToolPage() {
       >
         <p className="min-w-0 truncate pr-2 text-xs text-muted">{footerStatus}</p>
 
-        <div className="flex min-w-0 items-center justify-center gap-2">
+        <div className="scrollbar-hover flex min-w-0 items-center justify-start gap-2 overflow-x-auto md:justify-center">
           {workspaceMode === 'browse' && items.length > 0 ? (
             <>
               <WorkspaceFooterIconButton
@@ -862,7 +1031,7 @@ export function BorderToolPage() {
                 disabled={!canInspectPrevious}
                 onClick={handleInspectPrevious}
               />
-              <span className="min-w-[3rem] text-center text-xs tabular-nums text-muted">
+              <span className="min-w-[3rem] shrink-0 text-center text-xs tabular-nums text-muted">
                 {activeInspectIndex + 1} / {items.length}
               </span>
               <WorkspaceFooterIconButton
@@ -882,13 +1051,42 @@ export function BorderToolPage() {
                 onPointerCancel={handleCompareEnd}
               />
               <div className="mx-1 h-3 w-px bg-border" />
+              <WorkspaceFooterIconButton
+                label="Rotate left"
+                icon={RotateCcw}
+                shortcut="["
+                disabled={!directEditTargetId}
+                onClick={() => directEditTargetId && handleRotateImage(directEditTargetId, 'ccw')}
+              />
+              <WorkspaceFooterIconButton
+                label="Rotate right"
+                icon={RotateCw}
+                shortcut="]"
+                disabled={!directEditTargetId}
+                onClick={() => directEditTargetId && handleRotateImage(directEditTargetId, 'cw')}
+              />
+              <WorkspaceFooterIconButton
+                label="Flip horizontal"
+                icon={FlipHorizontal2}
+                pressed={directRecipe.flipHorizontal}
+                disabled={!directEditTargetId}
+                onClick={() => directEditTargetId && handleFlipImage(directEditTargetId, 'horizontal')}
+              />
+              <WorkspaceFooterIconButton
+                label="Flip vertical"
+                icon={FlipVertical2}
+                pressed={directRecipe.flipVertical}
+                disabled={!directEditTargetId}
+                onClick={() => directEditTargetId && handleFlipImage(directEditTargetId, 'vertical')}
+              />
+              <div className="mx-1 h-3 w-px bg-border" />
               <select
                 value={JSON.stringify(inspectZoom)}
                 onChange={(event) => {
                   setInspectZoom(JSON.parse(event.target.value) as InspectZoom)
                   handleCompareEnd()
                 }}
-                className="h-8 rounded-md border border-border bg-surface px-2.5 text-xs text-foreground"
+                className="h-8 shrink-0 rounded-md border border-border bg-surface px-2.5 text-xs text-foreground"
                 aria-label="Inspect zoom level"
               >
                 {inspectZoomOptions.map((option) => (

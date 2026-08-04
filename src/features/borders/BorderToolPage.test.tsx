@@ -44,7 +44,15 @@ vi.mock('@/features/borders/components/BrowseWorkspace', () => ({
   }: {
     getItemRecipe: (id: string) => { filterPresetId: string }
     getItemFilterAdjustments: (id: string) => { hueRotate?: number }
-    getItemMenuActions?: (id: string) => Array<{ label: string; onClick: () => void }>
+    getItemMenuActions?: (
+      id: string,
+    ) => Array<
+      | {
+          label: string
+          items: Array<{ label: string; onClick: () => void }>
+        }
+      | { type: 'separator' }
+    >
     onInspect?: (index: number) => void
     items?: Array<{ id: string }>
   }) => {
@@ -57,15 +65,30 @@ vi.mock('@/features/borders/components/BrowseWorkspace', () => ({
         <div data-testid="browse-recipe-filter">{recipe.filterPresetId}</div>
         <div data-testid="browse-filter">{adjustments?.hueRotate === -10 ? 'ember' : 'original'}</div>
         <button type="button" onClick={() => onInspect?.(0)}>Inspect image</button>
-        {menuActions.length > 0 ? (
-          <button
-            type="button"
-            data-testid="apply-to-selected"
-            onClick={() => menuActions[0]?.onClick()}
-          >
-            {menuActions[0].label}
-          </button>
-        ) : null}
+        {menuActions.map((action, index) => {
+          if ('items' in action) {
+            return (
+              <div key={index} data-testid={`menu-heading-${index}`}>
+                {action.label}
+                {action.items.map((item, itemIndex) => (
+                  <button
+                    key={itemIndex}
+                    type="button"
+                    data-testid={
+                      item.label === 'Apply to selected'
+                        ? 'apply-to-selected'
+                        : `menu-action-${index}-${itemIndex}`
+                    }
+                    onClick={item.onClick}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            )
+          }
+          return <div key={index} data-testid={`menu-separator-${index}`} />
+        })}
       </div>
     )
   },
@@ -410,5 +433,227 @@ describe('BorderToolPage workspace', () => {
     })
 
     expect(exportZipMock).not.toHaveBeenCalled()
+  })
+
+  it('rotates the direct edit target from the inspect footer', async () => {
+    useImageQueueMock.mockReturnValue({
+      items: [createItem('1', 'one.jpg')],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Inspect image' }))
+
+    const footer = screen.getByLabelText('Workspace footer')
+    const footerQueries = within(footer)
+
+    expect(footerQueries.getByRole('button', { name: 'Rotate right' })).toBeInTheDocument()
+    expect(footerQueries.getByRole('button', { name: 'Rotate left' })).toBeInTheDocument()
+    expect(footerQueries.getByRole('button', { name: 'Flip horizontal' })).toBeInTheDocument()
+    expect(footerQueries.getByRole('button', { name: 'Flip vertical' })).toBeInTheDocument()
+
+    const flipHorizontalButton = footerQueries.getByRole('button', { name: 'Flip horizontal' })
+    const flipVerticalButton = footerQueries.getByRole('button', { name: 'Flip vertical' })
+    expect(flipHorizontalButton).toHaveAttribute('aria-pressed', 'false')
+    expect(flipVerticalButton).toHaveAttribute('aria-pressed', 'false')
+
+    await userEvent.click(footerQueries.getByRole('button', { name: 'Rotate right' }))
+    await userEvent.click(flipHorizontalButton)
+
+    expect(flipHorizontalButton).toHaveAttribute('aria-pressed', 'true')
+    expect(flipVerticalButton).toHaveAttribute('aria-pressed', 'false')
+
+    await userEvent.click(screen.getByRole('button', { name: 'Export image' }))
+
+    await waitFor(() => {
+      expect(renderProcessedCanvasMock).toHaveBeenCalled()
+    })
+
+    expect(renderProcessedCanvasMock.mock.calls[0][0].rotationDegrees).toBe(90)
+    expect(renderProcessedCanvasMock.mock.calls[0][0].flipHorizontal).toBe(true)
+    expect(renderProcessedCanvasMock.mock.calls[0][0].flipVertical).toBe(false)
+  })
+
+  it('rotates a single card from its transform menu', async () => {
+    useImageQueueMock.mockReturnValue({
+      items: [createItem('1', 'one.jpg'), createItem('2', 'two.jpg')],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+
+    // First card's context menu: Rotate 90° CW
+    await userEvent.click(screen.getByRole('button', { name: 'Rotate 90° CW' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Export ZIP' }))
+
+    await waitFor(() => {
+      expect(renderProcessedCanvasMock).toHaveBeenCalled()
+    })
+
+    const calls = renderProcessedCanvasMock.mock.calls
+    expect(calls).toHaveLength(2)
+    expect(calls[0][0].rotationDegrees).toBe(90)
+    expect(calls[1][0].rotationDegrees).toBe(0)
+  })
+
+  it('rotates all selected images in a batch from the context menu', async () => {
+    useImageQueueMock.mockReturnValue({
+      items: [createItem('1', 'one.jpg'), createItem('2', 'two.jpg')],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+
+    const footer = screen.getByLabelText('Workspace footer')
+    await userEvent.click(within(footer).getByRole('button', { name: 'Select all' }))
+
+    await userEvent.click(screen.getByRole('button', { name: 'Rotate selected 90° CW' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Export ZIP' }))
+
+    await waitFor(() => {
+      expect(renderProcessedCanvasMock).toHaveBeenCalled()
+    })
+
+    const calls = renderProcessedCanvasMock.mock.calls
+    expect(calls).toHaveLength(2)
+    for (const call of calls) {
+      expect(call[0].rotationDegrees).toBe(90)
+    }
+  })
+
+  it('keeps rotation when applying a recipe to selected images', async () => {
+    useImageQueueMock.mockReturnValue({
+      items: [createItem('1', 'one.jpg'), createItem('2', 'two.jpg'), createItem('3', 'three.jpg')],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+
+    // Rotate the first card, then copy its recipe to the selection
+    await userEvent.click(screen.getByRole('button', { name: 'Rotate 90° CW' }))
+
+    const footer = screen.getByLabelText('Workspace footer')
+    await userEvent.click(within(footer).getByRole('button', { name: 'Select all' }))
+
+    const applyButton = screen.getByTestId('apply-to-selected')
+    expect(applyButton).toHaveTextContent('Apply to selected')
+    await userEvent.click(applyButton)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Export ZIP' }))
+
+    await waitFor(() => {
+      expect(renderProcessedCanvasMock).toHaveBeenCalled()
+    })
+
+    const calls = renderProcessedCanvasMock.mock.calls
+    expect(calls).toHaveLength(3)
+    for (const call of calls) {
+      expect(call[0].rotationDegrees).toBe(90)
+    }
+  })
+
+  it('rotates right with the ] shortcut while inspecting', async () => {
+    useImageQueueMock.mockReturnValue({
+      items: [createItem('1', 'one.jpg')],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+    await userEvent.click(screen.getByRole('button', { name: 'Inspect image' }))
+
+    fireEvent.keyDown(window, { key: ']', ctrlKey: true })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Export image' }))
+
+    await waitFor(() => {
+      expect(renderProcessedCanvasMock).toHaveBeenCalled()
+    })
+
+    expect(renderProcessedCanvasMock.mock.calls[0][0].rotationDegrees).toBe(90)
+  })
+
+  it('rotates left with the [ shortcut while inspecting', async () => {
+    useImageQueueMock.mockReturnValue({
+      items: [createItem('1', 'one.jpg')],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+    await userEvent.click(screen.getByRole('button', { name: 'Inspect image' }))
+
+    fireEvent.keyDown(window, { key: '[', ctrlKey: true })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Export image' }))
+
+    await waitFor(() => {
+      expect(renderProcessedCanvasMock).toHaveBeenCalled()
+    })
+
+    expect(renderProcessedCanvasMock.mock.calls[0][0].rotationDegrees).toBe(270)
+  })
+
+  it('ignores rotate shortcuts while a form control is focused', async () => {
+    useImageQueueMock.mockReturnValue({
+      items: [createItem('1', 'one.jpg')],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+    await userEvent.click(screen.getByRole('button', { name: 'Inspect image' }))
+
+    const zoomSelect = screen.getByLabelText('Inspect zoom level')
+    fireEvent.keyDown(zoomSelect, { key: ']' })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Export image' }))
+
+    await waitFor(() => {
+      expect(renderProcessedCanvasMock).toHaveBeenCalled()
+    })
+
+    expect(renderProcessedCanvasMock.mock.calls[0][0].rotationDegrees).toBe(0)
+  })
+
+  it('ignores rotate shortcuts in browse mode', async () => {
+    useImageQueueMock.mockReturnValue({
+      items: [createItem('1', 'one.jpg')],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+
+    fireEvent.keyDown(window, { key: ']', ctrlKey: true })
+
+    await userEvent.click(screen.getByRole('button', { name: 'Export image' }))
+
+    await waitFor(() => {
+      expect(renderProcessedCanvasMock).toHaveBeenCalled()
+    })
+
+    expect(renderProcessedCanvasMock.mock.calls[0][0].rotationDegrees).toBe(0)
   })
 })

@@ -1,5 +1,5 @@
 import { buildCanvasFilter, isNeutralFilter } from '@/features/borders/processing/filters'
-import type { FilterAdjustments, ImageSizingMode } from '@/features/borders/types'
+import type { FilterAdjustments, ImageSizingMode, SourceTransformOptions } from '@/features/borders/types'
 import { loadImageElement } from '@/shared/utils/imageLoader'
 
 export type ContainRectInput = {
@@ -24,14 +24,16 @@ export type ContainRect = {
   y: number
 }
 
+type TransformableSource = CanvasImageSource & {
+  width: number
+  height: number
+  naturalWidth?: number
+  naturalHeight?: number
+}
+
 type DrawImageOptions = {
   context: CanvasRenderingContext2D
-  image: CanvasImageSource & {
-    width: number
-    height: number
-    naturalWidth?: number
-    naturalHeight?: number
-  }
+  image: TransformableSource
   targetWidth: number
   targetHeight: number
   backgroundColor: string
@@ -40,6 +42,9 @@ type DrawImageOptions = {
   borderWidthPixels?: number
   minVerticalPaddingPixels?: number
   filterAdjustments?: FilterAdjustments
+  rotationDegrees?: number
+  flipHorizontal?: boolean
+  flipVertical?: boolean
 }
 
 type RenderCanvasOptions = {
@@ -52,9 +57,112 @@ type RenderCanvasOptions = {
   borderWidthPixels?: number
   minVerticalPaddingPixels?: number
   filterAdjustments?: FilterAdjustments
+  rotationDegrees?: number
+  flipHorizontal?: boolean
+  flipVertical?: boolean
+}
+
+export type SourceTransformMatrix = {
+  width: number
+  height: number
+  a: number
+  b: number
+  c: number
+  d: number
+  e: number
+  f: number
 }
 
 const previewMaxEdge = 720
+
+/**
+ * Pure transform math for rotating/flipping a source image.
+ *
+ * Returns the destination canvas size plus a 2D matrix (setTransform args) that
+ * maps source pixels to the destination. Flips are applied in view space (after
+ * rotation), matching image editors: rotate 90° then "flip horizontal" mirrors
+ * the rotated image left/right. Returns `null` when no transform is needed.
+ *
+ * For quarter turns the sin/cos values are snapped to exact 0/±1 so edges stay
+ * pixel-clean; any other angle gets a bounding-box canvas.
+ */
+export function computeSourceTransform(
+  sourceWidth: number,
+  sourceHeight: number,
+  { rotationDegrees = 0, flipHorizontal = false, flipVertical = false }: SourceTransformOptions = {},
+): SourceTransformMatrix | null {
+  const angle = ((rotationDegrees % 360) + 360) % 360
+  const needsRotation = angle !== 0
+  const needsFlip = flipHorizontal || flipVertical
+
+  if (!needsRotation && !needsFlip) {
+    return null
+  }
+
+  const snappedAngle = Math.round(angle / 90) * 90
+  const useAngle = Math.abs(angle - snappedAngle) < 1e-6 ? snappedAngle : angle
+  const radians = (useAngle * Math.PI) / 180
+  const rawCos = Math.cos(radians)
+  const rawSin = Math.sin(radians)
+  const cos = Math.abs(rawCos) < 1e-9 ? 0 : rawCos
+  const sin = Math.abs(rawSin) < 1e-9 ? 0 : rawSin
+
+  const width = Math.max(1, Math.round(Math.abs(sourceWidth * cos) + Math.abs(sourceHeight * sin)))
+  const height = Math.max(1, Math.round(Math.abs(sourceWidth * sin) + Math.abs(sourceHeight * cos)))
+
+  // M = T(center) · F · R, where F = diag(fx, fy). Expanding F·R gives:
+  //   a = fx·cos   b = fy·sin   c = -fx·sin   d = fy·cos
+  const fx = flipHorizontal ? -1 : 1
+  const fy = flipVertical ? -1 : 1
+
+  const a = fx * cos === 0 ? 0 : fx * cos
+  const b = fy * sin === 0 ? 0 : fy * sin
+  const c = -fx * sin === 0 ? 0 : -fx * sin
+  const d = fy * cos === 0 ? 0 : fy * cos
+
+  return {
+    width,
+    height,
+    a,
+    b,
+    c,
+    d,
+    e: width / 2,
+    f: height / 2,
+  }
+}
+
+/**
+ * Renders the source image rotated/flipped onto an offscreen canvas.
+ * Returns the original image unchanged when no transform is needed (or the
+ * canvas 2D context is unavailable).
+ */
+export function applySourceTransform(
+  image: TransformableSource,
+  options: SourceTransformOptions = {},
+): TransformableSource {
+  const sourceWidth = image.naturalWidth ?? image.width
+  const sourceHeight = image.naturalHeight ?? image.height
+  const transform = computeSourceTransform(sourceWidth, sourceHeight, options)
+
+  if (!transform) {
+    return image
+  }
+
+  const canvas = document.createElement('canvas')
+  canvas.width = transform.width
+  canvas.height = transform.height
+  const context = canvas.getContext('2d')
+
+  if (!context) {
+    return image
+  }
+
+  context.setTransform(transform.a, transform.b, transform.c, transform.d, transform.e, transform.f)
+  context.drawImage(image, -sourceWidth / 2, -sourceHeight / 2)
+
+  return canvas
+}
 
 export function calculateContainRect({
   sourceWidth,
@@ -226,6 +334,9 @@ export function drawImageOnCanvas({
   borderWidthPixels,
   minVerticalPaddingPixels,
   filterAdjustments,
+  rotationDegrees,
+  flipHorizontal,
+  flipVertical,
 }: DrawImageOptions) {
   const canvas = context.canvas
   canvas.width = targetWidth
@@ -234,8 +345,11 @@ export function drawImageOnCanvas({
   context.fillStyle = backgroundColor
   context.fillRect(0, 0, targetWidth, targetHeight)
 
-  const sourceWidth = image.naturalWidth ?? image.width
-  const sourceHeight = image.naturalHeight ?? image.height
+  // Rotate/flip the source first, then run the existing placement math on the
+  // transformed dimensions. The border pipeline is untouched.
+  const source = applySourceTransform(image, { rotationDegrees, flipHorizontal, flipVertical })
+  const sourceWidth = source.naturalWidth ?? source.width
+  const sourceHeight = source.naturalHeight ?? source.height
 
   const { drawWidth, drawHeight, x, y } = calculateImagePlacementRect({
     sourceWidth,
@@ -275,7 +389,7 @@ export function drawImageOnCanvas({
       context.filter = buildCanvasFilter(filterAdjustments)
     }
 
-    context.drawImage(image, x, y, drawWidth, drawHeight)
+    context.drawImage(source, x, y, drawWidth, drawHeight)
     context.filter = 'none'
   } finally {
     if (fixedSidesInsetRect) {
@@ -294,6 +408,9 @@ export async function renderProcessedCanvas({
   borderWidthPixels,
   minVerticalPaddingPixels,
   filterAdjustments,
+  rotationDegrees,
+  flipHorizontal,
+  flipVertical,
 }: RenderCanvasOptions) {
   const image = await loadImageElement(sourceUrl)
   const canvas = document.createElement('canvas')
@@ -314,6 +431,9 @@ export async function renderProcessedCanvas({
     borderWidthPixels,
     minVerticalPaddingPixels,
     filterAdjustments,
+    rotationDegrees,
+    flipHorizontal,
+    flipVertical,
   })
 
   return canvas

@@ -42,6 +42,13 @@ describe('describeChange', () => {
     )
   })
 
+  it('labels rotation and flip changes', () => {
+    expect(describeChange({ rotationDegrees: 90 })).toBe('Rotate: 90°')
+    expect(describeChange({ rotationDegrees: 270 })).toBe('Rotate: 270°')
+    expect(describeChange({ flipHorizontal: true })).toBe('Flip horizontal')
+    expect(describeChange({ flipVertical: true })).toBe('Flip vertical')
+  })
+
   it('falls back for empty patches', () => {
     expect(describeChange({})).toBe('Edit')
   })
@@ -58,9 +65,17 @@ describe('describeRecipe', () => {
     )
   })
 
-  it('resolves custom preset dimensions', () => {
+  it('includes rotation and flips when non-default', () => {
     expect(
-      describeRecipe({ ...defaultImageRecipe, presetId: 'custom', customWidth: 800, customHeight: 600 }),
-    ).toBe('Preset: Custom')
+      describeRecipe({
+        ...defaultImageRecipe,
+        rotationDegrees: 90,
+        flipHorizontal: true,
+      }),
+    ).toBe('Preset: Portrait Post · Rotate: 90° · Flip horizontal')
+  })
+
+  it('omits transform details when default', () => {
+    expect(describeRecipe(defaultImageRecipe)).toBe('Preset: Portrait Post')
   })
 })

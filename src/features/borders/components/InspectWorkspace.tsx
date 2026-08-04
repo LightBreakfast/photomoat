@@ -15,6 +15,9 @@ type InspectWorkspaceProps = {
   borderWidthPixels: number
   minVerticalPaddingPixels: number
   filterAdjustments?: FilterAdjustments
+  rotationDegrees?: number
+  flipHorizontal?: boolean
+  flipVertical?: boolean
   inspectZoom: InspectZoom
 }
 
@@ -27,6 +30,9 @@ export function InspectWorkspace({
   borderWidthPixels,
   minVerticalPaddingPixels,
   filterAdjustments,
+  rotationDegrees = 0,
+  flipHorizontal = false,
+  flipVertical = false,
   inspectZoom,
 }: InspectWorkspaceProps) {
   if (!item) {
@@ -60,6 +66,9 @@ export function InspectWorkspace({
           borderWidthPixels={borderWidthPixels}
           minVerticalPaddingPixels={minVerticalPaddingPixels}
           filterAdjustments={filterAdjustments}
+          rotationDegrees={rotationDegrees}
+          flipHorizontal={flipHorizontal}
+          flipVertical={flipVertical}
           label={`Inspect: ${item.filename}`}
           fullSize
           zoomPercent={zoomPercent}

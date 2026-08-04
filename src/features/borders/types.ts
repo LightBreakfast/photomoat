@@ -31,6 +31,16 @@ export type ImageEditRecipe = {
   customWidth: number
   customHeight: number
   filterPresetId: FilterPresetId
+  /** Clockwise rotation in degrees. The UI exposes quarter turns; the pipeline handles any angle. */
+  rotationDegrees: number
+  flipHorizontal: boolean
+  flipVertical: boolean
+}
+
+export type SourceTransformOptions = {
+  rotationDegrees?: number
+  flipHorizontal?: boolean
+  flipVertical?: boolean
 }
 
 export type EditHistoryEntry = {

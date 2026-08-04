@@ -19,6 +19,9 @@ describe('defaultImageRecipe', () => {
       customWidth: defaultCustomWidth,
       customHeight: defaultCustomHeight,
       filterPresetId: defaultFilterPresetId,
+      rotationDegrees: 0,
+      flipHorizontal: false,
+      flipVertical: false,
     })
   })
 })

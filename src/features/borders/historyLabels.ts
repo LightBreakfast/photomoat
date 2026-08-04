@@ -45,6 +45,15 @@ export function describeChange(patch: Partial<ImageEditRecipe>): string {
   if (patch.customHeight !== undefined) {
     parts.push(`Height: ${patch.customHeight}px`)
   }
+  if (patch.rotationDegrees !== undefined) {
+    parts.push(`Rotate: ${patch.rotationDegrees}°`)
+  }
+  if (patch.flipHorizontal !== undefined) {
+    parts.push('Flip horizontal')
+  }
+  if (patch.flipVertical !== undefined) {
+    parts.push('Flip vertical')
+  }
 
   return parts.length > 0 ? parts.join(' · ') : 'Edit'
 }
@@ -57,6 +66,15 @@ export function describeRecipe(recipe: ImageEditRecipe): string {
   const parts = [`Preset: ${preset.label}`]
   if (recipe.filterPresetId !== 'original') {
     parts.push(`Filter: ${getFilterPresetById(recipe.filterPresetId).label}`)
+  }
+  if (recipe.rotationDegrees !== 0) {
+    parts.push(`Rotate: ${recipe.rotationDegrees}°`)
+  }
+  if (recipe.flipHorizontal) {
+    parts.push('Flip horizontal')
+  }
+  if (recipe.flipVertical) {
+    parts.push('Flip vertical')
   }
   return parts.join(' · ')
 }

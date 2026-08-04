@@ -1,9 +1,11 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { resolveFilterAdjustments } from '@/features/borders/filterPresets'
 import {
+  applySourceTransform,
   calculateContainRect,
   calculateImagePlacementRect,
+  computeSourceTransform,
   drawImageOnCanvas,
   getPreviewCanvasSize,
 } from '@/features/borders/processing/canvasProcessor'
@@ -566,5 +568,254 @@ describe('drawImageOnCanvas filters', () => {
       'draw:none',
     ])
     expect(context.filter).toBe('none')
+  })
+})
+
+describe('computeSourceTransform', () => {
+  it('returns null when no transform is needed', () => {
+    expect(computeSourceTransform(1600, 900)).toBeNull()
+    expect(computeSourceTransform(1600, 900, { rotationDegrees: 0 })).toBeNull()
+    expect(
+      computeSourceTransform(1600, 900, { flipHorizontal: false, flipVertical: false }),
+    ).toBeNull()
+  })
+
+  it('swaps dimensions and maps corners for a 90° clockwise rotation', () => {
+    expect(computeSourceTransform(1600, 900, { rotationDegrees: 90 })).toEqual({
+      width: 900,
+      height: 1600,
+      a: 0,
+      b: 1,
+      c: -1,
+      d: 0,
+      e: 450,
+      f: 800,
+    })
+  })
+
+  it('keeps dimensions for a 180° rotation', () => {
+    expect(computeSourceTransform(1600, 900, { rotationDegrees: 180 })).toEqual({
+      width: 1600,
+      height: 900,
+      a: -1,
+      b: 0,
+      c: 0,
+      d: -1,
+      e: 800,
+      f: 450,
+    })
+  })
+
+  it('swaps dimensions for a 270° rotation (counter-clockwise)', () => {
+    expect(computeSourceTransform(1600, 900, { rotationDegrees: 270 })).toEqual({
+      width: 900,
+      height: 1600,
+      a: 0,
+      b: -1,
+      c: 1,
+      d: 0,
+      e: 450,
+      f: 800,
+    })
+  })
+
+  it('normalizes angles outside 0–360', () => {
+    expect(computeSourceTransform(1600, 900, { rotationDegrees: 450 })?.width).toBe(900)
+    expect(computeSourceTransform(1600, 900, { rotationDegrees: -90 })?.width).toBe(900)
+    expect(computeSourceTransform(1600, 900, { rotationDegrees: 360 })).toBeNull()
+  })
+
+  it('mirrors without rotation', () => {
+    expect(computeSourceTransform(1600, 900, { flipHorizontal: true })).toEqual({
+      width: 1600,
+      height: 900,
+      a: -1,
+      b: 0,
+      c: 0,
+      d: 1,
+      e: 800,
+      f: 450,
+    })
+    expect(computeSourceTransform(1600, 900, { flipVertical: true })).toEqual({
+      width: 1600,
+      height: 900,
+      a: 1,
+      b: 0,
+      c: 0,
+      d: -1,
+      e: 800,
+      f: 450,
+    })
+  })
+
+  it('applies flips after rotation (view space)', () => {
+    // Rotate 90° CW then flip horizontal: F·R = [[0,1],[1,0]]
+    expect(
+      computeSourceTransform(1600, 900, { rotationDegrees: 90, flipHorizontal: true }),
+    ).toEqual({
+      width: 900,
+      height: 1600,
+      a: 0,
+      b: 1,
+      c: 1,
+      d: 0,
+      e: 450,
+      f: 800,
+    })
+    // Rotate 90° CW then flip vertical: F·R = [[0,-1],[-1,0]]
+    expect(
+      computeSourceTransform(1600, 900, { rotationDegrees: 90, flipVertical: true }),
+    ).toEqual({
+      width: 900,
+      height: 1600,
+      a: 0,
+      b: -1,
+      c: -1,
+      d: 0,
+      e: 450,
+      f: 800,
+    })
+  })
+
+  it('computes a bounding box for arbitrary angles', () => {
+    const transform = computeSourceTransform(1000, 600, { rotationDegrees: 45 })
+    expect(transform?.width).toBe(1131)
+    expect(transform?.height).toBe(1131)
+  })
+})
+
+describe('applySourceTransform', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('returns the source unchanged when no transform is needed', () => {
+    const image = { width: 1600, height: 900 } as CanvasImageSource & {
+      width: number
+      height: number
+    }
+    expect(applySourceTransform(image)).toBe(image)
+    expect(applySourceTransform(image, { rotationDegrees: 0 })).toBe(image)
+  })
+
+  it('falls back to the original image when the 2D context is unavailable', () => {
+    // happy-dom canvases have no 2D context, exercising the fallback path
+    const image = { width: 1600, height: 900 } as CanvasImageSource & {
+      width: number
+      height: number
+    }
+    expect(applySourceTransform(image, { rotationDegrees: 90 })).toBe(image)
+  })
+
+  it('draws the rotated source onto an offscreen canvas with the computed matrix', () => {
+    const setTransform = vi.fn()
+    const drawImage = vi.fn()
+    const getContext = vi.fn(() => ({ setTransform, drawImage }))
+    const originalCreateElement = document.createElement.bind(document)
+
+    vi.spyOn(document, 'createElement').mockImplementation((tag, options) => {
+      const element = originalCreateElement(tag, options)
+      if (tag === 'canvas') {
+        Object.defineProperty(element, 'getContext', { value: getContext, configurable: true })
+      }
+      return element
+    })
+
+    const image = { width: 1600, height: 900 } as CanvasImageSource & {
+      width: number
+      height: number
+    }
+    const result = applySourceTransform(image, { rotationDegrees: 90 })
+
+    expect(result).not.toBe(image)
+    expect((result as HTMLCanvasElement).width).toBe(900)
+    expect((result as HTMLCanvasElement).height).toBe(1600)
+    expect(setTransform).toHaveBeenCalledWith(0, 1, -1, 0, 450, 800)
+    expect(drawImage).toHaveBeenCalledWith(image, -800, -450)
+  })
+})
+
+describe('drawImageOnCanvas with source transforms', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  function stubInnerCanvas(getContext: () => unknown) {
+    const originalCreateElement = document.createElement.bind(document)
+    vi.spyOn(document, 'createElement').mockImplementation((tag, options) => {
+      const element = originalCreateElement(tag, options)
+      if (tag === 'canvas') {
+        Object.defineProperty(element, 'getContext', { value: getContext, configurable: true })
+      }
+      return element
+    })
+  }
+
+  it('places the rotated source using its swapped dimensions', () => {
+    const calls: string[] = []
+    const context = {
+      canvas: { width: 0, height: 0 },
+      fillStyle: '',
+      filter: 'none',
+      fillRect: vi.fn(() => calls.push('fillRect')),
+      drawImage: vi.fn((_source: unknown, x: number, y: number, width: number, height: number) => {
+        calls.push(`draw:${x},${y},${width},${height}`)
+      }),
+    } as unknown as CanvasRenderingContext2D
+
+    stubInnerCanvas(() => ({ setTransform: vi.fn(), drawImage: vi.fn() }))
+
+    const image = { width: 1600, height: 900 } as CanvasImageSource & {
+      width: number
+      height: number
+    }
+
+    drawImageOnCanvas({
+      context,
+      image,
+      targetWidth: 1080,
+      targetHeight: 1080,
+      backgroundColor: '#ffffff',
+      sizingMode: 'contain',
+      rotationDegrees: 90,
+    })
+
+    // Rotated source is 900x1600; contain in 1080x1080 → scale 0.675
+    expect(calls).toEqual(['fillRect', 'draw:236.25,0,607.5,1080'])
+  })
+
+  it('flips the source in view space before placement', () => {
+    const calls: string[] = []
+    const context = {
+      canvas: { width: 0, height: 0 },
+      fillStyle: '',
+      filter: 'none',
+      fillRect: vi.fn(() => calls.push('fillRect')),
+      drawImage: vi.fn((_source: unknown, x: number, y: number, width: number, height: number) => {
+        calls.push(`draw:${x},${y},${width},${height}`)
+      }),
+    } as unknown as CanvasRenderingContext2D
+
+    const innerSetTransform = vi.fn()
+    stubInnerCanvas(() => ({ setTransform: innerSetTransform, drawImage: vi.fn() }))
+
+    const image = { width: 1600, height: 900 } as CanvasImageSource & {
+      width: number
+      height: number
+    }
+
+    drawImageOnCanvas({
+      context,
+      image,
+      targetWidth: 1080,
+      targetHeight: 1080,
+      backgroundColor: '#ffffff',
+      sizingMode: 'contain',
+      flipHorizontal: true,
+    })
+
+    expect(innerSetTransform).toHaveBeenCalledWith(-1, 0, 0, 1, 800, 450)
+    // Dimensions unchanged, placement identical to an unflipped source
+    expect(calls).toEqual(['fillRect', 'draw:0,236.25,1080,607.5'])
   })
 })

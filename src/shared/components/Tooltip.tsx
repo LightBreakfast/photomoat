@@ -7,7 +7,7 @@ import {
 } from '@/components/ui/tooltip'
 
 type TooltipProps = {
-  label: string
+  label: ReactNode
   children: ReactNode
 }
 

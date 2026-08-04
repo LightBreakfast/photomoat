@@ -14,6 +14,9 @@ const defaultRecipe: ImageEditRecipe = {
   customWidth: 1080,
   customHeight: 1080,
   filterPresetId: 'original',
+  rotationDegrees: 0,
+  flipHorizontal: false,
+  flipVertical: false,
 }
 
 const emberRecipe: ImageEditRecipe = {
@@ -325,5 +328,52 @@ describe('useImageEdits history', () => {
     })
 
     expect(result.current.getTimeline('a')).toBeUndefined()
+  })
+})
+
+describe('useImageEdits batch patches', () => {
+  it('applies a shared patch to many images', () => {
+    const { result } = renderHook(() => useImageEdits(defaultRecipe))
+
+    act(() => {
+      result.current.initializeImages(['a', 'b'])
+      result.current.patchImages(['a', 'b'], { rotationDegrees: 90 })
+    })
+
+    expect(result.current.getRecipe('a').rotationDegrees).toBe(90)
+    expect(result.current.getRecipe('b').rotationDegrees).toBe(90)
+  })
+
+  it('applies per-image patches via a factory and records one entry per image', () => {
+    const { result } = renderHook(() => useImageEdits(defaultRecipe))
+
+    act(() => {
+      result.current.initializeImages(['a', 'b'])
+      result.current.patchImage('a', { rotationDegrees: 90 })
+      result.current.patchImages(
+        ['a', 'b'],
+        (recipe) => ({ rotationDegrees: (recipe.rotationDegrees + 90) % 360 }),
+        'Rotate 2 images 90° CW',
+      )
+    })
+
+    // 'a' rotates from its own 90° to 180°; 'b' from 0° to 90°
+    expect(result.current.getRecipe('a').rotationDegrees).toBe(180)
+    expect(result.current.getRecipe('b').rotationDegrees).toBe(90)
+    expect(result.current.getTimeline('a')?.entries).toHaveLength(3)
+    expect(result.current.getTimeline('a')?.entries[2].label).toBe('Rotate 2 images 90° CW')
+    expect(result.current.getTimeline('b')?.entries[1].label).toBe('Rotate 2 images 90° CW')
+  })
+
+  it('skips images whose patch is a no-op', () => {
+    const { result } = renderHook(() => useImageEdits(defaultRecipe))
+
+    act(() => {
+      result.current.initializeImages(['a', 'b'])
+      result.current.patchImages(['a', 'b'], () => ({ rotationDegrees: 0 }))
+    })
+
+    expect(result.current.getTimeline('a')?.entries).toHaveLength(1)
+    expect(result.current.getTimeline('b')?.entries).toHaveLength(1)
   })
 })

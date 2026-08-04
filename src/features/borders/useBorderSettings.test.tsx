@@ -42,6 +42,9 @@ describe('useBorderSettings', () => {
       customWidth: 1920,
       customHeight: 1080,
       filterPresetId: 'ember',
+      rotationDegrees: 0,
+      flipHorizontal: false,
+      flipVertical: false,
     })
   })
 
