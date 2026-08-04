@@ -91,7 +91,9 @@ export function computeSourceTransform(
   sourceHeight: number,
   { rotationDegrees = 0, flipHorizontal = false, flipVertical = false }: SourceTransformOptions = {},
 ): SourceTransformMatrix | null {
-  const angle = ((rotationDegrees % 360) + 360) % 360
+  const angle = Number.isFinite(rotationDegrees)
+    ? ((rotationDegrees % 360) + 360) % 360
+    : 0
   const needsRotation = angle !== 0
   const needsFlip = flipHorizontal || flipVertical
 
@@ -130,38 +132,6 @@ export function computeSourceTransform(
     e: width / 2,
     f: height / 2,
   }
-}
-
-/**
- * Renders the source image rotated/flipped onto an offscreen canvas.
- * Returns the original image unchanged when no transform is needed (or the
- * canvas 2D context is unavailable).
- */
-export function applySourceTransform(
-  image: TransformableSource,
-  options: SourceTransformOptions = {},
-): TransformableSource {
-  const sourceWidth = image.naturalWidth ?? image.width
-  const sourceHeight = image.naturalHeight ?? image.height
-  const transform = computeSourceTransform(sourceWidth, sourceHeight, options)
-
-  if (!transform) {
-    return image
-  }
-
-  const canvas = document.createElement('canvas')
-  canvas.width = transform.width
-  canvas.height = transform.height
-  const context = canvas.getContext('2d')
-
-  if (!context) {
-    return image
-  }
-
-  context.setTransform(transform.a, transform.b, transform.c, transform.d, transform.e, transform.f)
-  context.drawImage(image, -sourceWidth / 2, -sourceHeight / 2)
-
-  return canvas
 }
 
 export function calculateContainRect({
@@ -323,6 +293,16 @@ export function getPreviewCanvasSize(width: number, height: number) {
   }
 }
 
+/**
+ * Composes the source transform directly into the destination context so no
+ * intermediate canvas is ever allocated (avoids a full-native-resolution
+ * bitmap for every transformed preview/export).
+ *
+ * The composite matrix is T(x,y) · S(draw/tw, draw/th) · M, where M is the
+ * matrix from `computeSourceTransform`. The original source is then drawn at
+ * its centered origin, mapping it rotated/flipped/scaled straight into the
+ * destination at the placement rect computed from the transformed dimensions.
+ */
 export function drawImageOnCanvas({
   context,
   image,
@@ -345,15 +325,20 @@ export function drawImageOnCanvas({
   context.fillStyle = backgroundColor
   context.fillRect(0, 0, targetWidth, targetHeight)
 
-  // Rotate/flip the source first, then run the existing placement math on the
-  // transformed dimensions. The border pipeline is untouched.
-  const source = applySourceTransform(image, { rotationDegrees, flipHorizontal, flipVertical })
-  const sourceWidth = source.naturalWidth ?? source.width
-  const sourceHeight = source.naturalHeight ?? source.height
+  const sourceWidth = image.naturalWidth ?? image.width
+  const sourceHeight = image.naturalHeight ?? image.height
+
+  const transform = computeSourceTransform(sourceWidth, sourceHeight, {
+    rotationDegrees,
+    flipHorizontal,
+    flipVertical,
+  })
+  const transformedWidth = transform ? transform.width : sourceWidth
+  const transformedHeight = transform ? transform.height : sourceHeight
 
   const { drawWidth, drawHeight, x, y } = calculateImagePlacementRect({
-    sourceWidth,
-    sourceHeight,
+    sourceWidth: transformedWidth,
+    sourceHeight: transformedHeight,
     targetWidth,
     targetHeight,
     sizingMode,
@@ -389,7 +374,22 @@ export function drawImageOnCanvas({
       context.filter = buildCanvasFilter(filterAdjustments)
     }
 
-    context.drawImage(source, x, y, drawWidth, drawHeight)
+    if (transform) {
+      const scaleX = drawWidth / transform.width
+      const scaleY = drawHeight / transform.height
+      context.setTransform(
+        scaleX * transform.a,
+        scaleY * transform.b,
+        scaleX * transform.c,
+        scaleY * transform.d,
+        scaleX * transform.e + x,
+        scaleY * transform.f + y,
+      )
+      context.drawImage(image, -sourceWidth / 2, -sourceHeight / 2)
+    } else {
+      context.drawImage(image, x, y, drawWidth, drawHeight)
+    }
+
     context.filter = 'none'
   } finally {
     if (fixedSidesInsetRect) {

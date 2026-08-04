@@ -2,7 +2,6 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import { resolveFilterAdjustments } from '@/features/borders/filterPresets'
 import {
-  applySourceTransform,
   calculateContainRect,
   calculateImagePlacementRect,
   computeSourceTransform,
@@ -684,86 +683,36 @@ describe('computeSourceTransform', () => {
   })
 })
 
-describe('applySourceTransform', () => {
-  afterEach(() => {
-    vi.restoreAllMocks()
-  })
-
-  it('returns the source unchanged when no transform is needed', () => {
-    const image = { width: 1600, height: 900 } as CanvasImageSource & {
-      width: number
-      height: number
-    }
-    expect(applySourceTransform(image)).toBe(image)
-    expect(applySourceTransform(image, { rotationDegrees: 0 })).toBe(image)
-  })
-
-  it('falls back to the original image when the 2D context is unavailable', () => {
-    // happy-dom canvases have no 2D context, exercising the fallback path
-    const image = { width: 1600, height: 900 } as CanvasImageSource & {
-      width: number
-      height: number
-    }
-    expect(applySourceTransform(image, { rotationDegrees: 90 })).toBe(image)
-  })
-
-  it('draws the rotated source onto an offscreen canvas with the computed matrix', () => {
-    const setTransform = vi.fn()
-    const drawImage = vi.fn()
-    const getContext = vi.fn(() => ({ setTransform, drawImage }))
-    const originalCreateElement = document.createElement.bind(document)
-
-    vi.spyOn(document, 'createElement').mockImplementation((tag, options) => {
-      const element = originalCreateElement(tag, options)
-      if (tag === 'canvas') {
-        Object.defineProperty(element, 'getContext', { value: getContext, configurable: true })
-      }
-      return element
-    })
-
-    const image = { width: 1600, height: 900 } as CanvasImageSource & {
-      width: number
-      height: number
-    }
-    const result = applySourceTransform(image, { rotationDegrees: 90 })
-
-    expect(result).not.toBe(image)
-    expect((result as HTMLCanvasElement).width).toBe(900)
-    expect((result as HTMLCanvasElement).height).toBe(1600)
-    expect(setTransform).toHaveBeenCalledWith(0, 1, -1, 0, 450, 800)
-    expect(drawImage).toHaveBeenCalledWith(image, -800, -450)
-  })
-})
-
 describe('drawImageOnCanvas with source transforms', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  function stubInnerCanvas(getContext: () => unknown) {
-    const originalCreateElement = document.createElement.bind(document)
-    vi.spyOn(document, 'createElement').mockImplementation((tag, options) => {
-      const element = originalCreateElement(tag, options)
-      if (tag === 'canvas') {
-        Object.defineProperty(element, 'getContext', { value: getContext, configurable: true })
-      }
-      return element
-    })
-  }
-
-  it('places the rotated source using its swapped dimensions', () => {
-    const calls: string[] = []
-    const context = {
+  function createContext(calls: string[]) {
+    return {
       canvas: { width: 0, height: 0 },
       fillStyle: '',
       filter: 'none',
       fillRect: vi.fn(() => calls.push('fillRect')),
-      drawImage: vi.fn((_source: unknown, x: number, y: number, width: number, height: number) => {
-        calls.push(`draw:${x},${y},${width},${height}`)
+      setTransform: vi.fn(
+        (
+          a: number,
+          b: number,
+          c: number,
+          d: number,
+          e: number,
+          f: number,
+        ) => calls.push(`setTransform:${a},${b},${c},${d},${e},${f}`),
+      ),
+      drawImage: vi.fn((_source: unknown, x: number, y: number, width?: number, height?: number) => {
+        calls.push(`draw:${x},${y},${width ?? ''},${height ?? ''}`)
       }),
     } as unknown as CanvasRenderingContext2D
+  }
 
-    stubInnerCanvas(() => ({ setTransform: vi.fn(), drawImage: vi.fn() }))
+  it('composes the rotated source directly into the destination context', () => {
+    const calls: string[] = []
+    const context = createContext(calls)
 
     const image = { width: 1600, height: 900 } as CanvasImageSource & {
       width: number
@@ -780,24 +729,19 @@ describe('drawImageOnCanvas with source transforms', () => {
       rotationDegrees: 90,
     })
 
-    // Rotated source is 900x1600; contain in 1080x1080 → scale 0.675
-    expect(calls).toEqual(['fillRect', 'draw:236.25,0,607.5,1080'])
+    // Rotated source is 900x1600; contain in 1080x1080 → scale 0.675.
+    // The composite matrix maps the original source into the placement rect
+    // (236.25, 0, 607.5, 1080) without an intermediate canvas.
+    expect(calls).toEqual([
+      'fillRect',
+      'setTransform:0,0.675,-0.675,0,540,540',
+      'draw:-800,-450,,' ,
+    ])
   })
 
   it('flips the source in view space before placement', () => {
     const calls: string[] = []
-    const context = {
-      canvas: { width: 0, height: 0 },
-      fillStyle: '',
-      filter: 'none',
-      fillRect: vi.fn(() => calls.push('fillRect')),
-      drawImage: vi.fn((_source: unknown, x: number, y: number, width: number, height: number) => {
-        calls.push(`draw:${x},${y},${width},${height}`)
-      }),
-    } as unknown as CanvasRenderingContext2D
-
-    const innerSetTransform = vi.fn()
-    stubInnerCanvas(() => ({ setTransform: innerSetTransform, drawImage: vi.fn() }))
+    const context = createContext(calls)
 
     const image = { width: 1600, height: 900 } as CanvasImageSource & {
       width: number
@@ -814,8 +758,34 @@ describe('drawImageOnCanvas with source transforms', () => {
       flipHorizontal: true,
     })
 
-    expect(innerSetTransform).toHaveBeenCalledWith(-1, 0, 0, 1, 800, 450)
-    // Dimensions unchanged, placement identical to an unflipped source
-    expect(calls).toEqual(['fillRect', 'draw:0,236.25,1080,607.5'])
+    expect(calls).toEqual([
+      'fillRect',
+      'setTransform:-0.675,0,0,0.675,540,540',
+      'draw:-800,-450,,' ,
+    ])
+  })
+
+  it('never allocates an intermediate canvas for a transformed draw', () => {
+    const createElementSpy = vi.spyOn(document, 'createElement')
+    const context = createContext([])
+
+    const image = { width: 1600, height: 900 } as CanvasImageSource & {
+      width: number
+      height: number
+    }
+
+    drawImageOnCanvas({
+      context,
+      image,
+      targetWidth: 1080,
+      targetHeight: 1080,
+      backgroundColor: '#ffffff',
+      sizingMode: 'contain',
+      rotationDegrees: 90,
+      flipHorizontal: true,
+      flipVertical: true,
+    })
+
+    expect(createElementSpy).not.toHaveBeenCalled()
   })
 })
