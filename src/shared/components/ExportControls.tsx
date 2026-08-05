@@ -8,11 +8,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import {
-  DialogClose,
-  DialogTitle,
-} from '@/components/ui/dialog'
+import { DialogClose, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { ScrubberInput } from '@/shared/components/ScrubberInput'
 import { SplitButton } from '@/shared/components/SplitButton'
 import {
@@ -51,14 +49,13 @@ export type BatchExportControlsProps = {
 
 type ExportControlsProps = SingleExportControlsProps | BatchExportControlsProps
 
-const actionButtonClassName =
-  'inline-flex items-center justify-center gap-2 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50'
-
-const dialogInputClassName =
-  'w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
-
+/**
+ * Shared token-button style: border-only badge with consistent focus ring.
+ * Matches the app's input radius (rounded-md) and uses bg-surface for
+ * contrast against the popover background.
+ */
 const tokenButtonClassName =
-  'rounded-md border border-border bg-surface px-1.5 py-0.5 font-mono text-[0.7rem] leading-none text-muted outline-none transition-colors hover:border-ring hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50'
+  'rounded-md border border-border bg-surface px-1.5 py-0.5 font-mono text-[0.7rem] leading-none text-muted outline-none transition-colors hover:border-ring hover:text-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
 
 export function ExportControls(props: ExportControlsProps) {
   const patternInputRef = useRef<HTMLInputElement>(null)
@@ -66,15 +63,13 @@ export function ExportControls(props: ExportControlsProps) {
 
   if (props.variant === 'single') {
     return (
-      <button
-        type="button"
+      <Button
         disabled={props.disabled}
         onClick={() => void props.onDownload()}
-        className={actionButtonClassName}
       >
         <Download size={15} />
         {props.label ?? 'Download'}
-      </button>
+      </Button>
     )
   }
 
@@ -133,15 +128,13 @@ export function ExportControls(props: ExportControlsProps) {
       <div className="space-y-4">
         <label className="block space-y-1.5">
           <span className="text-xs font-medium text-muted">Filename pattern</span>
-          <input
+          <Input
             ref={patternInputRef}
-            type="text"
             autoFocus
             value={props.filenamePattern}
             onChange={(event) => props.onFilenamePatternChange(event.target.value)}
             placeholder={defaultFilenamePattern}
             aria-label="Filename pattern"
-            className={dialogInputClassName}
           />
           {renderTokenButtons('pattern', 'into pattern')}
           <span className="block truncate text-xs text-muted" aria-live="polite">
@@ -151,13 +144,11 @@ export function ExportControls(props: ExportControlsProps) {
 
         <label className="block space-y-1.5">
           <span className="text-xs font-medium text-muted">Folder name (ZIP)</span>
-          <input
+          <Input
             ref={folderInputRef}
-            type="text"
             value={props.folderName}
             onChange={(event) => props.onFolderNameChange(event.target.value)}
             aria-label="Folder name"
-            className={dialogInputClassName}
           />
           {renderTokenButtons('folder', 'into folder name')}
           <span className="block truncate text-xs text-muted" aria-live="polite">
@@ -166,11 +157,11 @@ export function ExportControls(props: ExportControlsProps) {
         </label>
       </div>
 
-      <div className="flex items-center justify-between gap-2">
-        <Button type="button" variant="ghost" onClick={props.onResetExportSettings}>
+      <div className="flex items-center justify-between gap-2 border-t border-border pt-4">
+        <Button type="button" variant="outline" onClick={props.onResetExportSettings}>
           Reset to defaults
         </Button>
-        <DialogClose render={<Button variant="default">Done</Button>} />
+        <DialogClose render={<Button>Done</Button>} />
       </div>
     </>
   )

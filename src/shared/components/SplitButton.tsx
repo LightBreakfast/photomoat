@@ -1,6 +1,7 @@
 import { ChevronDown } from 'lucide-react'
 import type { ReactNode } from 'react'
 
+import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogTrigger } from '@/components/ui/dialog'
 
 type SplitButtonProps = {
@@ -14,9 +15,6 @@ type SplitButtonProps = {
   dialogContent: ReactNode
   dialogContentClassName?: string
 }
-
-const splitButtonPartClassName =
-  'inline-flex items-center justify-center gap-2 bg-accent text-sm font-medium text-accent-foreground outline-none transition-colors disabled:cursor-not-allowed disabled:opacity-50 focus-visible:ring-3 focus-visible:ring-ring/50'
 
 /**
  * A primary action button with an attached settings trigger. The caret opens a
@@ -34,24 +32,24 @@ export function SplitButton({
 }: SplitButtonProps) {
   return (
     <div className="flex w-full">
-      <button
-        type="button"
+      <Button
         disabled={disabled}
         onClick={() => void onAction()}
-        className={`${splitButtonPartClassName} flex-1 rounded-l-md px-3 py-1.5`}
+        className="flex-1 rounded-l-md"
       >
         {icon}
         {label}
-      </button>
+      </Button>
 
       <Dialog>
         <DialogTrigger
           render={
-            <button
-              type="button"
+            <Button
               disabled={disabled}
               aria-label={caretLabel}
-              className={`${splitButtonPartClassName} w-8 shrink-0 rounded-r-md border-l border-accent-foreground/20`}
+              aria-haspopup="dialog"
+              className="w-8 shrink-0 rounded-r-md border-l border-primary-foreground/20"
+              size="icon"
             />
           }
         >

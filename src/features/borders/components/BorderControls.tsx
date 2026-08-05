@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
 import { ScrubberInput } from '@/shared/components/ScrubberInput'
 
 const swatches = ['#ffffff', '#000000', '#f5f5f5', '#e2e2e2', '#d4d4d4', '#1a1a1a']
@@ -93,8 +94,7 @@ export function BorderControls({
             />
           </label>
         </div>
-        <input
-          type="text"
+        <Input
           value={backgroundColor}
           onChange={(event) => onBackgroundColorChange(event.target.value)}
           onBlur={(event) => onBackgroundColorCommit?.(event.currentTarget.value)}
@@ -104,7 +104,6 @@ export function BorderControls({
             }
           }}
           disabled={disabled}
-          className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           inputMode="text"
           aria-label="Background colour hex value"
         />
