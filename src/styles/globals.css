@@ -131,12 +131,11 @@
   }
 }
 
-/* App-wide scrollbar standard: thin hairline scrollbar with a stable gutter,
- * so content never shifts when a scrollbar appears. */
+/* App-wide scrollbar standard: thin hairline scrollbars without reserving
+ * an empty gutter when a scroll container has no scrollbar. */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
-  scrollbar-gutter: stable;
 }
 
 *::-webkit-scrollbar {
