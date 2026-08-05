@@ -122,7 +122,7 @@ describe('ExportControls', () => {
     expect(onFilenamePatternChange).toHaveBeenLastCalledWith('my-pattern')
   })
 
-  it('inserts a token at the cursor position', async () => {
+  it('inserts a token at the cursor position in the pattern', async () => {
     const onFilenamePatternChange = vi.fn()
     const user = userEvent.setup()
 
@@ -133,9 +133,25 @@ describe('ExportControls', () => {
     await user.click(input)
     await user.keyboard('{End}')
 
-    await user.click(screen.getByRole('button', { name: 'Insert {datetime}' }))
+    await user.click(screen.getByRole('button', { name: 'Insert {datetime} into pattern' }))
 
     expect(onFilenamePatternChange).toHaveBeenLastCalledWith('{name}{datetime}')
+  })
+
+  it('inserts a token into the folder name', async () => {
+    const onFolderNameChange = vi.fn()
+    const user = userEvent.setup()
+
+    renderBatch({ onFolderNameChange })
+
+    await user.click(screen.getByRole('button', { name: 'Export options' }))
+    const input = await screen.findByLabelText('Folder name')
+    await user.click(input)
+    await user.keyboard('{End}')
+
+    await user.click(screen.getByRole('button', { name: 'Insert {date} into folder name' }))
+
+    expect(onFolderNameChange).toHaveBeenLastCalledWith('photomoat-borders{date}')
   })
 
   it('shows a filename preview derived from the first export item', async () => {
@@ -158,6 +174,17 @@ describe('ExportControls', () => {
     await user.click(screen.getByRole('button', { name: 'Export options' }))
 
     expect(await screen.findByText('Preview: my-trip.zip')).toBeInTheDocument()
+  })
+
+  it('applies tokens to the folder preview', async () => {
+    renderBatch({ folderName: 'my-trip-{date}' })
+
+    const user = userEvent.setup()
+    await user.click(screen.getByRole('button', { name: 'Export options' }))
+
+    expect(
+      await screen.findByText(/^Preview: my-trip-\d{4}-\d{2}-\d{2}\.zip$/),
+    ).toBeInTheDocument()
   })
 
   it('fires the reset action from the dialog', async () => {

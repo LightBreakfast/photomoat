@@ -184,4 +184,31 @@ describe('createExportZipName', () => {
     expect(createExportZipName(defaultFolderName)).toBe('photomoat-borders.zip')
     expect(defaultFilenamePattern).toBe('{name}-bordered')
   })
+
+  it('applies date and datetime tokens to the folder name', () => {
+    expect(createExportZipName('backup-{date}', { date: fixedDate })).toBe(
+      'backup-2026-07-15.zip',
+    )
+    expect(createExportZipName('{datetime}', { date: fixedDate })).toBe(
+      '2026-07-15-090503.zip',
+    )
+  })
+
+  it('substitutes the name token with the first export item', () => {
+    expect(createExportZipName('{name}-trip', { originalFilename: 'IMG_001.jpg' })).toBe(
+      'IMG_001-trip.zip',
+    )
+  })
+
+  it('leaves unknown tokens literal in the folder name', () => {
+    expect(createExportZipName('x-{size}', { date: fixedDate })).toBe('x-{size}.zip')
+  })
+
+  it('strips separators after token substitution', () => {
+    expect(createExportZipName('a/{date}', { date: fixedDate })).toBe('a2026-07-15.zip')
+  })
+
+  it('falls back to the default when substitution leaves nothing', () => {
+    expect(createExportZipName('///{name}')).toBe(`${defaultFolderName}.zip`)
+  })
 })

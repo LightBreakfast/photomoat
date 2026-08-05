@@ -78,12 +78,22 @@ export function createExportFilename({
   return `${base}.${getExtensionFromFormat(format)}`
 }
 
-/** Sanitizes a folder name into a `*.zip` archive name. */
-export function createExportZipName(folderName: string) {
-  const cleaned = folderName
-    .trim()
-    .replace(/[/\\]/g, '')
-    .replace(/\.zip$/i, '')
+export type CreateExportZipNameOptions = {
+  /** Base filename used for the `{name}` token (e.g. the first export item). */
+  originalFilename?: string
+  date?: Date
+}
+
+/** Sanitizes a folder name into a `*.zip` archive name, applying pattern tokens. */
+export function createExportZipName(
+  folderName: string,
+  { originalFilename, date }: CreateExportZipNameOptions = {},
+) {
+  const patternName = originalFilename ? getBaseFilename(originalFilename) : ''
+  const withPattern = folderName.trim()
+    ? applyFilenamePattern(folderName, patternName, date)
+    : ''
+  const cleaned = withPattern.replace(/[/\\]/g, '').replace(/\.zip$/i, '')
 
   return `${cleaned || defaultFolderName}.zip`
 }

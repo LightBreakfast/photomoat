@@ -10,9 +10,6 @@ import {
 } from '@/components/ui/select'
 import {
   DialogClose,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -61,10 +58,11 @@ const dialogInputClassName =
   'w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
 
 const tokenButtonClassName =
-  'rounded border border-border bg-surface px-1 py-0.5 font-mono text-[0.7rem] leading-none text-muted transition-colors hover:border-ring hover:text-foreground'
+  'rounded-md border border-border bg-surface px-1.5 py-0.5 font-mono text-[0.7rem] leading-none text-muted outline-none transition-colors hover:border-ring hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50'
 
 export function ExportControls(props: ExportControlsProps) {
   const patternInputRef = useRef<HTMLInputElement>(null)
+  const folderInputRef = useRef<HTMLInputElement>(null)
 
   if (props.variant === 'single') {
     return (
@@ -89,17 +87,21 @@ export function ExportControls(props: ExportControlsProps) {
     format: props.outputFormat,
     pattern: props.filenamePattern,
   })
-  const folderPreview = createExportZipName(props.folderName)
+  const folderPreview = createExportZipName(props.folderName, {
+    originalFilename: previewBaseFilename,
+  })
 
-  const insertPatternToken = (token: string) => {
-    const input = patternInputRef.current
+  const insertPatternToken = (token: string, target: 'pattern' | 'folder') => {
+    const input = target === 'pattern' ? patternInputRef.current : folderInputRef.current
     if (!input) {
       return
     }
 
     const start = input.selectionStart ?? input.value.length
     const end = input.selectionEnd ?? input.value.length
-    props.onFilenamePatternChange(input.value.slice(0, start) + token + input.value.slice(end))
+    const onChange =
+      target === 'pattern' ? props.onFilenamePatternChange : props.onFolderNameChange
+    onChange(input.value.slice(0, start) + token + input.value.slice(end))
 
     requestAnimationFrame(() => {
       input.focus()
@@ -108,16 +110,25 @@ export function ExportControls(props: ExportControlsProps) {
     })
   }
 
+  const renderTokenButtons = (target: 'pattern' | 'folder', nameSuffix: string) => (
+    <span className="flex flex-wrap gap-1">
+      {filenamePatternTokens.map((token) => (
+        <button
+          key={token}
+          type="button"
+          onClick={() => insertPatternToken(token, target)}
+          className={tokenButtonClassName}
+          aria-label={`Insert ${token} ${nameSuffix}`}
+        >
+          {token}
+        </button>
+      ))}
+    </span>
+  )
+
   const dialogContent = (
     <>
-      <DialogHeader>
-        <DialogTitle>Export settings</DialogTitle>
-        <DialogDescription>
-          Use {'{name}'} for the original filename and {'{date}'} / {'{time}'} /{' '}
-          {'{datetime}'} for timestamps. The folder name is used for the ZIP
-          archive.
-        </DialogDescription>
-      </DialogHeader>
+      <DialogTitle>Export settings</DialogTitle>
 
       <div className="space-y-4">
         <label className="block space-y-1.5">
@@ -132,20 +143,7 @@ export function ExportControls(props: ExportControlsProps) {
             aria-label="Filename pattern"
             className={dialogInputClassName}
           />
-          <span className="block">
-            <span className="sr-only">Insert token</span>
-            {filenamePatternTokens.map((token) => (
-              <button
-                key={token}
-                type="button"
-                onClick={() => insertPatternToken(token)}
-                className={`${tokenButtonClassName} mr-1`}
-                aria-label={`Insert ${token}`}
-              >
-                {token}
-              </button>
-            ))}
-          </span>
+          {renderTokenButtons('pattern', 'into pattern')}
           <span className="block truncate text-xs text-muted" aria-live="polite">
             Preview: {filenamePreview}
           </span>
@@ -154,29 +152,26 @@ export function ExportControls(props: ExportControlsProps) {
         <label className="block space-y-1.5">
           <span className="text-xs font-medium text-muted">Folder name (ZIP)</span>
           <input
+            ref={folderInputRef}
             type="text"
             value={props.folderName}
             onChange={(event) => props.onFolderNameChange(event.target.value)}
             aria-label="Folder name"
             className={dialogInputClassName}
           />
+          {renderTokenButtons('folder', 'into folder name')}
           <span className="block truncate text-xs text-muted" aria-live="polite">
             Preview: {folderPreview}
           </span>
         </label>
       </div>
 
-      <DialogFooter>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={props.onResetExportSettings}
-          className="mr-auto"
-        >
+      <div className="flex items-center justify-between gap-2">
+        <Button type="button" variant="ghost" onClick={props.onResetExportSettings}>
           Reset to defaults
         </Button>
-        <DialogClose render={<Button variant="outline">Done</Button>} />
-      </DialogFooter>
+        <DialogClose render={<Button variant="default">Done</Button>} />
+      </div>
     </>
   )
 

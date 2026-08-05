@@ -682,7 +682,9 @@ export function BorderToolPage() {
     try {
       await exportZip({
         items: itemsToExport,
-        zipFilename: createExportZipName(exportSettings.folderName),
+        zipFilename: createExportZipName(exportSettings.folderName, {
+          originalFilename: itemsToExport[0]?.filename,
+        }),
         createEntry: async (item) => {
           setItemStatus(item.id, 'processing')
 
