@@ -106,7 +106,7 @@ export function ScrubberInput({
   const visibleLabel = scrubLabel ?? label
   const dragHandleClassName = [
     isInline ? 'shrink-0' : 'inline-block shrink-0 px-1',
-    'text-xs font-medium text-muted select-none',
+    'text-xs font-medium text-muted-foreground select-none',
     disabled
       ? 'cursor-not-allowed opacity-50'
       : isDragging
@@ -138,7 +138,7 @@ export function ScrubberInput({
 
   if (isInline) {
     return (
-      <label className="flex items-center justify-between gap-2 text-xs font-medium text-muted select-none">
+      <label className="flex items-center justify-between gap-2 text-xs font-medium text-muted-foreground select-none">
         <span onMouseDown={handleMouseDown} className={dragHandleClassName}>
           {visibleLabel}
         </span>
@@ -150,7 +150,7 @@ export function ScrubberInput({
   return (
     <label className="block min-w-0 space-y-1">
       {scrubLabel ? (
-        <span className="block text-xs font-medium text-muted">{label}</span>
+        <span className="block text-xs font-medium text-muted-foreground">{label}</span>
       ) : (
         <span onMouseDown={handleMouseDown} className={dragHandleClassName}>
           {label}

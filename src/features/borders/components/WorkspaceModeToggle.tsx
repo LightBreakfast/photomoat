@@ -34,7 +34,7 @@ export function WorkspaceModeToggle({
           isCompact ? 'h-8 px-2.5 text-xs leading-none' : 'h-8 px-3 text-xs',
           mode === 'browse'
             ? 'border-border bg-background text-foreground shadow-sm'
-            : 'border-transparent text-muted hover:bg-surface-muted hover:text-foreground',
+            : 'border-transparent text-muted-foreground hover:bg-surface-muted hover:text-foreground',
         )}
       >
         <Grid3X3 size={12} aria-hidden="true" />
@@ -51,7 +51,7 @@ export function WorkspaceModeToggle({
           isCompact ? 'h-8 px-2.5 text-xs leading-none' : 'h-8 px-3 text-xs',
           mode === 'inspect'
             ? 'border-border bg-background text-foreground shadow-sm'
-            : 'border-transparent text-muted hover:bg-surface-muted hover:text-foreground',
+            : 'border-transparent text-muted-foreground hover:bg-surface-muted hover:text-foreground',
         )}
       >
         <Search size={12} aria-hidden="true" />

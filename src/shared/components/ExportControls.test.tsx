@@ -106,7 +106,8 @@ describe('ExportControls', () => {
     const dialog = screen.getByRole('dialog')
     expect(within(dialog).getByText('Export settings')).toBeInTheDocument()
     expect(within(dialog).getByLabelText('Filename pattern')).toHaveValue('{name}-bordered')
-    expect(within(dialog).getByLabelText('Folder name')).toHaveValue('photomoat-borders')
+    expect(within(dialog).getByLabelText('ZIP file name')).toHaveValue('photomoat-borders')
+    expect(within(dialog).queryByRole('button', { name: 'Close' })).not.toBeInTheDocument()
   })
 
   it('emits pattern changes from the filename input', async () => {
@@ -145,7 +146,7 @@ describe('ExportControls', () => {
     renderBatch({ onFolderNameChange })
 
     await user.click(screen.getByRole('button', { name: 'Export options' }))
-    const input = await screen.findByLabelText('Folder name')
+    const input = await screen.findByLabelText('ZIP file name')
     await user.click(input)
     await user.keyboard('{End}')
 
@@ -164,7 +165,7 @@ describe('ExportControls', () => {
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'Export options' }))
 
-    expect(await screen.findByText(/^Preview: portrait-\d{4}-\d{2}-\d{2}\.png$/)).toBeInTheDocument()
+    expect(await screen.findByText(/^portrait-\d{4}-\d{2}-\d{2}\.png$/)).toBeInTheDocument()
   })
 
   it('shows the folder preview with the zip extension', async () => {
@@ -173,7 +174,7 @@ describe('ExportControls', () => {
     const user = userEvent.setup()
     await user.click(screen.getByRole('button', { name: 'Export options' }))
 
-    expect(await screen.findByText('Preview: my-trip.zip')).toBeInTheDocument()
+    expect(await screen.findByText('my-trip.zip')).toBeInTheDocument()
   })
 
   it('applies tokens to the folder preview', async () => {
@@ -183,7 +184,7 @@ describe('ExportControls', () => {
     await user.click(screen.getByRole('button', { name: 'Export options' }))
 
     expect(
-      await screen.findByText(/^Preview: my-trip-\d{4}-\d{2}-\d{2}\.zip$/),
+      await screen.findByText(/^my-trip-\d{4}-\d{2}-\d{2}\.zip$/),
     ).toBeInTheDocument()
   })
 

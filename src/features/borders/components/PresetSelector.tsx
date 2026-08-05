@@ -59,7 +59,7 @@ function InstagramIcon({ className }: { className?: string }) {
 function PresetSummary({ label, dimensions, icon }: PresetSummaryProps) {
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted">
+      <span className="flex size-8 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground">
         {icon === 'instagram' ? (
           <InstagramIcon className="size-3.5" />
         ) : (
@@ -68,7 +68,7 @@ function PresetSummary({ label, dimensions, icon }: PresetSummaryProps) {
       </span>
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium text-foreground">{label}</div>
-        <div className="text-xs tabular-nums text-muted">{dimensions} px</div>
+        <div className="text-xs tabular-nums text-muted-foreground">{dimensions} px</div>
       </div>
     </div>
   )
@@ -99,7 +99,7 @@ export function PresetSelector({
 
   return (
     <div className="space-y-1">
-      <p className="text-xs font-medium uppercase tracking-wider text-muted">Size</p>
+      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Size</p>
 
       <div
         className={[
@@ -142,7 +142,7 @@ export function PresetSelector({
                     <div className="truncate font-medium text-foreground">
                       {getPresetDisplayLabel(preset.label)}
                     </div>
-                    <div className="text-xs tabular-nums text-muted">
+                    <div className="text-xs tabular-nums text-muted-foreground">
                       {preset.width}×{preset.height} px
                     </div>
                   </div>
@@ -155,7 +155,7 @@ export function PresetSelector({
               <SelectItem value="custom" className="pr-2 [&>span:last-child]:hidden">
                 <div className="min-w-0 flex-1 py-1">
                   <div className="truncate font-medium text-foreground">Custom</div>
-                  <div className="text-xs tabular-nums text-muted">
+                  <div className="text-xs tabular-nums text-muted-foreground">
                     {customWidth}×{customHeight} px
                   </div>
                 </div>

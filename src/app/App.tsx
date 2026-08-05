@@ -18,7 +18,7 @@ export default function App() {
             href="https://github.com/LightBreakfast/photomoat"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted hover:text-foreground"
+            className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground"
             aria-label="Open PhotoMoat GitHub repository"
           >
             <GitHubMarkIcon className="size-4" />
@@ -27,7 +27,7 @@ export default function App() {
             <button
               type="button"
               onClick={() => setInfoOpen((open) => !open)}
-              className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted hover:text-foreground"
+              className="flex h-8 w-8 items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground"
               aria-label="About PhotoMoat"
               aria-expanded={infoOpen}
             >
@@ -43,7 +43,7 @@ export default function App() {
                 />
                 <div className="absolute right-0 top-10 z-20 w-72 border border-border bg-surface p-4 shadow-lg">
                   <p className="text-sm font-semibold text-foreground">PhotoMoat</p>
-                  <p className="mt-2 text-xs leading-relaxed text-muted">
+                  <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                     All image processing happens in your browser. Nothing is uploaded to any server.
                     Export Instagram-ready bordered images individually or as a ZIP batch.
                   </p>

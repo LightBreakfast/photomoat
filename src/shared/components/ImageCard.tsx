@@ -149,7 +149,7 @@ export function ImageCard({
                     onInspect()
                   }}
                   className={[
-                    'flex h-7 w-7 items-center justify-center rounded-md bg-background/80 text-muted transition-opacity',
+                    'flex h-7 w-7 items-center justify-center rounded-md bg-background/80 text-muted-foreground transition-opacity',
                     isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
                   ].join(' ')}
                   aria-label={`Inspect ${item.filename}`}
@@ -166,7 +166,7 @@ export function ImageCard({
                       <button
                         type="button"
                         className={[
-                          'flex h-7 w-7 items-center justify-center rounded-md bg-background/80 text-muted transition-opacity',
+                          'flex h-7 w-7 items-center justify-center rounded-md bg-background/80 text-muted-foreground transition-opacity',
                           isSelected ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100',
                         ].join(' ')}
                         aria-label={`More actions for ${item.filename}`}
@@ -234,7 +234,7 @@ export function ImageCard({
         <div className="min-w-0 flex-1">
           <p className="truncate text-sm font-medium text-foreground">{item.filename}</p>
           {dimensionsLabel ? (
-            <p className="text-xs text-muted">{dimensionsLabel}</p>
+            <p className="text-xs text-muted-foreground">{dimensionsLabel}</p>
           ) : null}
         </div>
         <div className="flex shrink-0 items-center gap-1">
@@ -245,7 +245,7 @@ export function ImageCard({
                 event.stopPropagation()
                 onRemove()
               }}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-muted hover:text-foreground"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground"
               aria-label={`Remove ${item.filename}`}
             >
               <Trash2 size={14} />
@@ -259,7 +259,7 @@ export function ImageCard({
                 event.stopPropagation()
                 void onDownload()
               }}
-              className="flex h-7 w-7 items-center justify-center rounded-md text-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+              className="flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
               aria-label={`Download ${item.filename}`}
             >
               {isDownloading ? (

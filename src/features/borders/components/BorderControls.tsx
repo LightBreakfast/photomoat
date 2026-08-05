@@ -59,7 +59,7 @@ export function BorderControls({
   return (
     <div className="space-y-5">
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           Background
         </p>
         <div className="flex flex-wrap gap-1.5">
@@ -78,7 +78,7 @@ export function BorderControls({
               style={{ backgroundColor: swatch }}
             />
           ))}
-          <label className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border text-muted hover:text-foreground">
+          <label className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground">
             <Palette size={14} />
             <input
               type="color"
@@ -110,11 +110,11 @@ export function BorderControls({
       </div>
 
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           Image sizing
         </p>
         <label className="block space-y-1">
-          <span className="text-xs font-medium text-muted">Mode</span>
+          <span className="text-xs font-medium text-muted-foreground">Mode</span>
           <Select
             value={imageSizingMode}
             onValueChange={(value) => onImageSizingModeChange(value as ImageSizingMode)}

@@ -74,8 +74,8 @@ export function Dropzone({ onFilesAccepted, variant = 'full' }: DropzoneProps) {
               input.value = ''
             }}
           />
-          <Upload size={20} className="text-muted" />
-          <span className="text-xs font-medium text-muted">Upload images</span>
+          <Upload size={20} className="text-muted-foreground" />
+          <span className="text-xs font-medium text-muted-foreground">Upload images</span>
         </div>
         {error ? (
           <p className="text-xs text-danger" role="alert">{error}</p>
@@ -123,8 +123,8 @@ export function Dropzone({ onFilesAccepted, variant = 'full' }: DropzoneProps) {
             input.value = ''
           }}
         />
-        <Upload size={16} className="shrink-0 text-muted" />
-        <span className="text-xs text-muted">
+        <Upload size={16} className="shrink-0 text-muted-foreground" />
+        <span className="text-xs text-muted-foreground">
           <span className="font-medium text-foreground">Choose files</span> or drop here
         </span>
       </div>

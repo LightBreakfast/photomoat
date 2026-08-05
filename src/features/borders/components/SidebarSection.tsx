@@ -20,7 +20,7 @@ export function SidebarSection({ title, defaultOpen = true, children }: SidebarS
         aria-expanded={isOpen}
         aria-controls={contentId}
         id={labelId}
-        className="flex w-full items-center justify-between rounded-md px-0.5 py-1 text-xs font-medium uppercase tracking-wider text-muted hover:text-foreground"
+        className="flex w-full items-center justify-between rounded-md px-0.5 py-1 text-xs font-medium uppercase tracking-wider text-muted-foreground hover:text-foreground"
       >
         {title}
         <ChevronDown

@@ -805,7 +805,7 @@ export function BorderToolPage() {
   const leftPanelContent = (
     <div className="space-y-5">
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           Images
         </p>
         <Dropzone
@@ -905,7 +905,7 @@ export function BorderToolPage() {
             <button
               type="button"
               onClick={() => setMobilePanel('left')}
-              className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-xs text-muted hover:text-foreground"
+              className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-xs text-muted-foreground hover:text-foreground"
               aria-label="Open edit controls"
             >
               <Pencil size={16} />
@@ -915,7 +915,7 @@ export function BorderToolPage() {
               <button
                 type="button"
                 onClick={() => setMobilePanel('right')}
-                className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-xs text-muted hover:text-foreground"
+                className="flex h-8 items-center gap-1.5 rounded-md border border-border bg-surface px-2.5 text-xs text-muted-foreground hover:text-foreground"
                 aria-label="Open output controls"
               >
                 <Package size={16} />
@@ -1003,7 +1003,7 @@ export function BorderToolPage() {
         aria-label="Workspace footer"
         className="grid h-12 shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 border-t border-border bg-surface px-4"
       >
-        <p className="min-w-0 truncate pr-2 text-xs text-muted">{footerStatus}</p>
+        <p className="min-w-0 truncate pr-2 text-xs text-muted-foreground">{footerStatus}</p>
 
         <div className="scrollbar-hover flex min-w-0 items-center justify-start gap-2 overflow-x-auto md:justify-center">
           {workspaceMode === 'browse' && items.length > 0 ? (
@@ -1031,7 +1031,7 @@ export function BorderToolPage() {
               />
               <div className="mx-1 h-3 w-px bg-border" />
               <label className="flex h-8 items-center gap-1.5 rounded-md px-1">
-                <Grid3X3 size={12} className="text-muted" />
+                <Grid3X3 size={12} className="text-muted-foreground" />
                 <input
                   type="range"
                   min={1}
@@ -1053,7 +1053,7 @@ export function BorderToolPage() {
                 disabled={!canInspectPrevious}
                 onClick={handleInspectPrevious}
               />
-              <span className="min-w-[3rem] shrink-0 text-center text-xs tabular-nums text-muted">
+              <span className="min-w-[3rem] shrink-0 text-center text-xs tabular-nums text-muted-foreground">
                 {activeInspectIndex + 1} / {items.length}
               </span>
               <WorkspaceFooterIconButton

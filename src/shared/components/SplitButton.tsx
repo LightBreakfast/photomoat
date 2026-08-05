@@ -14,6 +14,8 @@ type SplitButtonProps = {
   /** Content rendered inside the settings dialog. */
   dialogContent: ReactNode
   dialogContentClassName?: string
+  /** Whether the dialog includes the standard top-right close button. */
+  showDialogCloseButton?: boolean
 }
 
 /**
@@ -29,13 +31,14 @@ export function SplitButton({
   caretLabel,
   dialogContent,
   dialogContentClassName,
+  showDialogCloseButton = true,
 }: SplitButtonProps) {
   return (
     <div className="flex w-full">
       <Button
         disabled={disabled}
         onClick={() => void onAction()}
-        className="flex-1 rounded-l-md"
+        className="flex-1 rounded-l-lg rounded-r-none"
       >
         {icon}
         {label}
@@ -48,7 +51,7 @@ export function SplitButton({
               disabled={disabled}
               aria-label={caretLabel}
               aria-haspopup="dialog"
-              className="w-8 shrink-0 rounded-r-md border-l border-primary-foreground/20"
+              className="w-8 shrink-0 rounded-l-none rounded-r-lg border-l border-primary-foreground/20"
               size="icon"
             />
           }
@@ -56,7 +59,10 @@ export function SplitButton({
           <ChevronDown size={15} />
         </DialogTrigger>
 
-        <DialogContent className={dialogContentClassName}>
+        <DialogContent
+          className={dialogContentClassName}
+          showCloseButton={showDialogCloseButton}
+        >
           {dialogContent}
         </DialogContent>
       </Dialog>

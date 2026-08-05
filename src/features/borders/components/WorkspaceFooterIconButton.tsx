@@ -64,7 +64,7 @@ export function WorkspaceFooterIconButton({
           disabled && 'cursor-not-allowed opacity-40',
           pressed
             ? 'border-accent bg-surface-muted text-foreground'
-            : 'border-transparent text-muted hover:bg-surface-muted hover:text-foreground active:bg-surface-muted',
+            : 'border-transparent text-muted-foreground hover:bg-surface-muted hover:text-foreground active:bg-surface-muted',
         )}
       >
         <Icon size={14} />

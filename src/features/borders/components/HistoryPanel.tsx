@@ -36,7 +36,7 @@ export function HistoryPanel({
   return (
     <section className={className}>
       <div className="flex items-center justify-between">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted">History</p>
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">History</p>
         <div className="flex items-center gap-0.5">
           <WorkspaceFooterIconButton
             label="Undo"
@@ -70,8 +70,8 @@ export function HistoryPanel({
                   isCurrent
                     ? 'bg-accent/15 font-medium text-foreground'
                     : isFuture
-                      ? 'text-muted opacity-60 hover:bg-surface-muted'
-                      : 'text-muted hover:bg-surface-muted hover:text-foreground',
+                      ? 'text-muted-foreground opacity-60 hover:bg-surface-muted'
+                      : 'text-muted-foreground hover:bg-surface-muted hover:text-foreground',
                 )}
               >
                 <span className="min-w-0 truncate">{entry.label}</span>

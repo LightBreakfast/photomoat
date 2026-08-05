@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useId, useRef } from 'react'
 import { Download, Package } from 'lucide-react'
 import type { ExportFormat } from '@/shared/types'
 import {
@@ -55,11 +55,15 @@ type ExportControlsProps = SingleExportControlsProps | BatchExportControlsProps
  * contrast against the popover background.
  */
 const tokenButtonClassName =
-  'rounded-md border border-border bg-surface px-1.5 py-0.5 font-mono text-[0.7rem] leading-none text-muted outline-none transition-colors hover:border-ring hover:text-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
+  'rounded-md border border-border bg-surface px-1.5 py-0.5 font-mono text-[0.7rem] leading-none text-muted-foreground outline-none transition-colors hover:border-ring hover:text-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
 
 export function ExportControls(props: ExportControlsProps) {
   const patternInputRef = useRef<HTMLInputElement>(null)
   const folderInputRef = useRef<HTMLInputElement>(null)
+  const patternInputId = useId()
+  const patternPreviewId = useId()
+  const folderInputId = useId()
+  const folderPreviewId = useId()
 
   if (props.variant === 'single') {
     return (
@@ -123,38 +127,46 @@ export function ExportControls(props: ExportControlsProps) {
 
   const dialogContent = (
     <>
-      <DialogTitle>Export settings</DialogTitle>
+      <DialogTitle className="text-lg font-semibold">Export settings</DialogTitle>
 
-      <div className="space-y-4">
-        <label className="block space-y-1.5">
-          <span className="text-xs font-medium text-muted">Filename pattern</span>
+      <div className="space-y-5">
+        <div className="space-y-2">
+          <label htmlFor={patternInputId} className="block text-xs font-medium text-muted-foreground">
+            Filename pattern
+          </label>
           <Input
             ref={patternInputRef}
+            id={patternInputId}
             autoFocus
             value={props.filenamePattern}
             onChange={(event) => props.onFilenamePatternChange(event.target.value)}
             placeholder={defaultFilenamePattern}
-            aria-label="Filename pattern"
+            aria-describedby={patternPreviewId}
           />
           {renderTokenButtons('pattern', 'into pattern')}
-          <span className="block truncate text-xs text-muted" aria-live="polite">
-            Preview: {filenamePreview}
-          </span>
-        </label>
+          <p id={patternPreviewId} className="truncate text-xs">
+            <span className="text-muted-foreground">Preview: </span>
+            <span className="font-mono text-foreground">{filenamePreview}</span>
+          </p>
+        </div>
 
-        <label className="block space-y-1.5">
-          <span className="text-xs font-medium text-muted">Folder name (ZIP)</span>
+        <div className="space-y-2">
+          <label htmlFor={folderInputId} className="block text-xs font-medium text-muted-foreground">
+            ZIP file name
+          </label>
           <Input
             ref={folderInputRef}
+            id={folderInputId}
             value={props.folderName}
             onChange={(event) => props.onFolderNameChange(event.target.value)}
-            aria-label="Folder name"
+            aria-describedby={folderPreviewId}
           />
           {renderTokenButtons('folder', 'into folder name')}
-          <span className="block truncate text-xs text-muted" aria-live="polite">
-            Preview: {folderPreview}
-          </span>
-        </label>
+          <p id={folderPreviewId} className="truncate text-xs">
+            <span className="text-muted-foreground">Preview: </span>
+            <span className="font-mono text-foreground">{folderPreview}</span>
+          </p>
+        </div>
       </div>
 
       <div className="flex items-center justify-between gap-2 border-t border-border pt-4">
@@ -170,7 +182,7 @@ export function ExportControls(props: ExportControlsProps) {
     <div className="space-y-3">
       <div className="space-y-2">
         <label className="block space-y-1">
-          <span className="text-xs font-medium text-muted">Format</span>
+          <span className="text-xs font-medium text-muted-foreground">Format</span>
           <Select
             value={props.outputFormat}
             onValueChange={(value) => props.onOutputFormatChange(value as ExportFormat)}
@@ -211,6 +223,8 @@ export function ExportControls(props: ExportControlsProps) {
         onAction={props.onExport}
         caretLabel="Export options"
         dialogContent={dialogContent}
+        dialogContentClassName="gap-5 p-5 sm:max-w-md"
+        showDialogCloseButton={false}
       />
 
       {props.progress ? (
@@ -223,7 +237,7 @@ export function ExportControls(props: ExportControlsProps) {
       ) : null}
 
       {props.progressMessage ? (
-        <p className="text-xs text-muted" aria-live="polite">
+        <p className="text-xs text-muted-foreground" aria-live="polite">
           {props.progressMessage}
         </p>
       ) : null}
