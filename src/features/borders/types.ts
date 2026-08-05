@@ -65,6 +65,10 @@ export type EditTimeline = {
 export type ExportSettings = {
   outputFormat: ExportFormat
   jpegQuality: number
+  /** Filename template with `{name}`, `{date}`, `{time}`, `{datetime}` tokens. */
+  filenamePattern: string
+  /** ZIP archive name (extension appended on export). */
+  folderName: string
 }
 
 /** @deprecated Use ImageEditRecipe + ExportSettings instead. */

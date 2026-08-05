@@ -39,7 +39,7 @@ import { useImageQueue } from '@/shared/hooks/useImageQueue'
 import type { ImageQueueItem } from '@/shared/types'
 import { canvasToBlob, downloadBlob } from '@/shared/utils/downloadBlob'
 import { exportZip } from '@/shared/utils/exportZip'
-import { createBorderedFilename } from '@/shared/utils/filename'
+import { createExportFilename, createExportZipName } from '@/shared/utils/filename'
 
 const inspectZoomOptions: { label: string; value: InspectZoom }[] = [
   { label: 'Fit', value: { mode: 'fit' } },
@@ -56,6 +56,9 @@ export function BorderToolPage() {
     settings: exportSettings,
     setOutputFormat,
     setJpegQuality,
+    setFilenamePattern,
+    setFolderName,
+    resetExportSettings,
   } = useExportSettings()
 
   // Per-image edit state (in-memory)
@@ -647,7 +650,14 @@ export function BorderToolPage() {
 
     try {
       const blob = await createProcessedBlob(item)
-      downloadBlob(blob, createBorderedFilename(item.filename, exportSettings.outputFormat))
+      downloadBlob(
+        blob,
+        createExportFilename({
+          originalFilename: item.filename,
+          format: exportSettings.outputFormat,
+          pattern: exportSettings.filenamePattern,
+        }),
+      )
       setItemStatus(item.id, 'ready')
       setProgressMessage(`${item.filename} downloaded.`)
     } catch {
@@ -672,7 +682,7 @@ export function BorderToolPage() {
     try {
       await exportZip({
         items: itemsToExport,
-        zipFilename: 'photomoat-borders.zip',
+        zipFilename: createExportZipName(exportSettings.folderName),
         createEntry: async (item) => {
           setItemStatus(item.id, 'processing')
 
@@ -681,7 +691,11 @@ export function BorderToolPage() {
             setItemStatus(item.id, 'ready')
 
             return {
-              filename: createBorderedFilename(item.filename, exportSettings.outputFormat),
+              filename: createExportFilename({
+                originalFilename: item.filename,
+                format: exportSettings.outputFormat,
+                pattern: exportSettings.filenamePattern,
+              }),
               blob,
             }
           } catch (error) {
@@ -852,9 +866,15 @@ export function BorderToolPage() {
             disabled={exportItems.length === 0}
             outputFormat={exportSettings.outputFormat}
             jpegQuality={exportSettings.jpegQuality}
+            filenamePattern={exportSettings.filenamePattern}
+            folderName={exportSettings.folderName}
             onOutputFormatChange={setOutputFormat}
             onJpegQualityChange={setJpegQuality}
+            onFilenamePatternChange={setFilenamePattern}
+            onFolderNameChange={setFolderName}
+            onResetExportSettings={resetExportSettings}
             exportCount={exportItems.length}
+            previewFilename={exportItems[0]?.filename}
             onExport={handleExport}
             progressMessage={progressMessage}
             progress={progress}

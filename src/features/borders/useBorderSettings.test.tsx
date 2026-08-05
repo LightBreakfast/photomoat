@@ -35,6 +35,8 @@ describe('useBorderSettings', () => {
       backgroundColor: '#000000',
       outputFormat: 'image/jpeg',
       jpegQuality: 0.8,
+      filenamePattern: '{name}-bordered',
+      folderName: 'photomoat-borders',
       imageSizingMode: 'border-width',
       imageEdgePixels: 840,
       borderWidthPixels: 72,

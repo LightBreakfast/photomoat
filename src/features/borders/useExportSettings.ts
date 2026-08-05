@@ -1,12 +1,31 @@
 import { useEffect, useState } from 'react'
 
 import type { ExportSettings } from '@/features/borders/types'
+import { defaultFilenamePattern, defaultFolderName } from '@/shared/utils/filename'
 
 export const exportSettingsStorageKey = 'photomoat-export-settings'
 
 const defaultExportSettings: ExportSettings = {
   outputFormat: 'image/png',
   jpegQuality: 0.92,
+  filenamePattern: defaultFilenamePattern,
+  folderName: defaultFolderName,
+}
+
+function sanitizeFilenamePattern(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    return defaultExportSettings.filenamePattern
+  }
+
+  return value.trim()
+}
+
+function sanitizeFolderName(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim()) {
+    return defaultExportSettings.folderName
+  }
+
+  return value.trim().replace(/[/\\]/g, '')
 }
 
 function sanitizeExportSettings(settings: Partial<ExportSettings>): ExportSettings {
@@ -17,6 +36,8 @@ function sanitizeExportSettings(settings: Partial<ExportSettings>): ExportSettin
       typeof settings.jpegQuality === 'number' && Number.isFinite(settings.jpegQuality)
         ? Math.min(1, Math.max(0, settings.jpegQuality))
         : defaultExportSettings.jpegQuality,
+    filenamePattern: sanitizeFilenamePattern(settings.filenamePattern),
+    folderName: sanitizeFolderName(settings.folderName),
   } satisfies ExportSettings
 }
 
@@ -64,6 +85,11 @@ export function useExportSettings() {
       setSettings((current) => ({ ...current, outputFormat })),
     setJpegQuality: (jpegQuality: number) =>
       setSettings((current) => ({ ...current, jpegQuality })),
+    setFilenamePattern: (filenamePattern: string) =>
+      setSettings((current) => ({ ...current, filenamePattern })),
+    setFolderName: (folderName: string) =>
+      setSettings((current) => ({ ...current, folderName })),
+    resetExportSettings: () => setSettings(defaultExportSettings),
   }
 }
 
