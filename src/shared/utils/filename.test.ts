@@ -135,6 +135,25 @@ describe('createExportFilename', () => {
       }),
     ).toBe('café.jpg')
   })
+
+  it('strips path separators so ZIP entries stay flat', () => {
+    expect(
+      createExportFilename({
+        originalFilename: 'portrait.jpg',
+        format: 'image/png',
+        pattern: 'album/{name}',
+        date: fixedDate,
+      }),
+    ).toBe('albumportrait.png')
+    expect(
+      createExportFilename({
+        originalFilename: 'portrait.jpg',
+        format: 'image/png',
+        pattern: 'a\\b\\{name}',
+        date: fixedDate,
+      }),
+    ).toBe('abportrait.png')
+  })
 })
 
 describe('createExportZipName', () => {

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -93,15 +93,20 @@ describe('ExportControls', () => {
     expect(onJpegQualityChange).toHaveBeenCalledWith(0.95)
   })
 
-  it('opens the export options menu from the caret', async () => {
+  it('opens the export settings dialog from the caret', async () => {
     renderBatch()
+
+    expect(screen.getByRole('button', { name: 'Export options' })).toHaveAttribute(
+      'aria-haspopup',
+      'dialog',
+    )
 
     await openExportOptions()
 
-    const menu = screen.getByRole('menu')
-    expect(within(menu).getByText('File naming')).toBeInTheDocument()
-    expect(within(menu).getByLabelText('Filename pattern')).toHaveValue('{name}-bordered')
-    expect(within(menu).getByLabelText('Folder name')).toHaveValue('photomoat-borders')
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText('Export settings')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Filename pattern')).toHaveValue('{name}-bordered')
+    expect(within(dialog).getByLabelText('Folder name')).toHaveValue('photomoat-borders')
   })
 
   it('emits pattern changes from the filename input', async () => {
@@ -155,15 +160,28 @@ describe('ExportControls', () => {
     expect(await screen.findByText('Preview: my-trip.zip')).toBeInTheDocument()
   })
 
-  it('fires the reset action from the menu', async () => {
+  it('fires the reset action from the dialog', async () => {
     const onResetExportSettings = vi.fn()
 
     renderBatch({ onResetExportSettings })
 
     const user = await openExportOptions()
-    await user.click(await screen.findByRole('menuitem', { name: /reset to defaults/i }))
+    await user.click(await screen.findByRole('button', { name: /reset to defaults/i }))
 
     expect(onResetExportSettings).toHaveBeenCalled()
+  })
+
+  it('closes the dialog with the Done button', async () => {
+    renderBatch()
+
+    const user = await openExportOptions()
+    expect(screen.getByRole('dialog')).toBeInTheDocument()
+
+    await user.click(screen.getByRole('button', { name: 'Done' }))
+
+    await waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
   })
 
   it('calls the export action from the main button', async () => {

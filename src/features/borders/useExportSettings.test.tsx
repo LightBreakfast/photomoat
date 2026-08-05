@@ -77,6 +77,17 @@ describe('useExportSettings', () => {
     expect(result.current.settings.folderName).toBe(defaultExportSettings.folderName)
   })
 
+  it('falls back to the default folder name when only separators remain', () => {
+    window.localStorage.setItem(
+      exportSettingsStorageKey,
+      JSON.stringify({ folderName: '///' }),
+    )
+
+    const { result } = renderHook(() => useExportSettings())
+
+    expect(result.current.settings.folderName).toBe(defaultExportSettings.folderName)
+  })
+
   it('migrates export fields from the old combined storage key', () => {
     window.localStorage.removeItem(exportSettingsStorageKey)
     window.localStorage.setItem(

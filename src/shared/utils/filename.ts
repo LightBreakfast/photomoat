@@ -68,7 +68,12 @@ export function createExportFilename({
   pattern,
   date,
 }: CreateExportFilenameOptions) {
-  const base = applyFilenamePattern(pattern, getBaseFilename(originalFilename), date)
+  // Path separators are stripped so ZIP entries stay flat and downloads stay
+  // single files (matches the folder-name sanitizer's rules).
+  const base = applyFilenamePattern(pattern, getBaseFilename(originalFilename), date).replace(
+    /[/\\]/g,
+    '',
+  )
 
   return `${base}.${getExtensionFromFormat(format)}`
 }

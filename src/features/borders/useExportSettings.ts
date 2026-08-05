@@ -25,7 +25,7 @@ function sanitizeFolderName(value: unknown): string {
     return defaultExportSettings.folderName
   }
 
-  return value.trim().replace(/[/\\]/g, '')
+  return value.trim().replace(/[/\\]/g, '') || defaultExportSettings.folderName
 }
 
 function sanitizeExportSettings(settings: Partial<ExportSettings>): ExportSettings {

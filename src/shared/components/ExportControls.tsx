@@ -9,11 +9,13 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import {
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuGroup,
-  DropdownMenuSeparator,
-} from '@/components/ui/dropdown-menu'
+  DialogClose,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
 import { ScrubberInput } from '@/shared/components/ScrubberInput'
 import { SplitButton } from '@/shared/components/SplitButton'
 import {
@@ -55,7 +57,7 @@ type ExportControlsProps = SingleExportControlsProps | BatchExportControlsProps
 const actionButtonClassName =
   'inline-flex items-center justify-center gap-2 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-foreground disabled:cursor-not-allowed disabled:opacity-50'
 
-const menuInputClassName =
+const dialogInputClassName =
   'w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm text-foreground outline-none transition-colors focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50'
 
 const tokenButtonClassName =
@@ -106,21 +108,29 @@ export function ExportControls(props: ExportControlsProps) {
     })
   }
 
-  const menuContent = (
-    <div className="w-72 space-y-4">
-      <DropdownMenuGroup>
-        <DropdownMenuLabel>File naming</DropdownMenuLabel>
+  const dialogContent = (
+    <>
+      <DialogHeader>
+        <DialogTitle>Export settings</DialogTitle>
+        <DialogDescription>
+          Use {'{name}'} for the original filename and {'{date}'} / {'{time}'} /{' '}
+          {'{datetime}'} for timestamps. The folder name is used for the ZIP
+          archive.
+        </DialogDescription>
+      </DialogHeader>
 
-        <label className="block space-y-1.5 px-1 pb-0.5">
-          <span className="block text-xs font-medium text-muted">Filename pattern</span>
+      <div className="space-y-4">
+        <label className="block space-y-1.5">
+          <span className="text-xs font-medium text-muted">Filename pattern</span>
           <input
             ref={patternInputRef}
             type="text"
+            autoFocus
             value={props.filenamePattern}
             onChange={(event) => props.onFilenamePatternChange(event.target.value)}
             placeholder={defaultFilenamePattern}
             aria-label="Filename pattern"
-            className={menuInputClassName}
+            className={dialogInputClassName}
           />
           <span className="block">
             <span className="sr-only">Insert token</span>
@@ -141,27 +151,33 @@ export function ExportControls(props: ExportControlsProps) {
           </span>
         </label>
 
-        <label className="block space-y-1.5 px-1">
-          <span className="block text-xs font-medium text-muted">Folder name (ZIP)</span>
+        <label className="block space-y-1.5">
+          <span className="text-xs font-medium text-muted">Folder name (ZIP)</span>
           <input
             type="text"
             value={props.folderName}
             onChange={(event) => props.onFolderNameChange(event.target.value)}
             aria-label="Folder name"
-            className={menuInputClassName}
+            className={dialogInputClassName}
           />
           <span className="block truncate text-xs text-muted" aria-live="polite">
             Preview: {folderPreview}
           </span>
         </label>
-      </DropdownMenuGroup>
+      </div>
 
-      <DropdownMenuSeparator />
-
-      <DropdownMenuItem onClick={props.onResetExportSettings}>
-        Reset to defaults
-      </DropdownMenuItem>
-    </div>
+      <DialogFooter>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={props.onResetExportSettings}
+          className="mr-auto"
+        >
+          Reset to defaults
+        </Button>
+        <DialogClose render={<Button variant="outline">Done</Button>} />
+      </DialogFooter>
+    </>
   )
 
   return (
@@ -207,8 +223,8 @@ export function ExportControls(props: ExportControlsProps) {
         icon={<ExportIcon size={16} />}
         disabled={props.disabled}
         onAction={props.onExport}
-        menuLabel="Export options"
-        menuContent={menuContent}
+        caretLabel="Export options"
+        dialogContent={dialogContent}
       />
 
       {props.progress ? (
