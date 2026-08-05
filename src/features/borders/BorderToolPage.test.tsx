@@ -10,11 +10,13 @@ const {
   renderProcessedCanvasMock,
   exportZipMock,
   canvasToBlobMock,
+  downloadBlobMock,
 } = vi.hoisted(() => ({
   useImageQueueMock: vi.fn(),
   renderProcessedCanvasMock: vi.fn(),
   exportZipMock: vi.fn(),
   canvasToBlobMock: vi.fn(),
+  downloadBlobMock: vi.fn(),
 }))
 
 vi.mock('@/shared/hooks/useImageQueue', () => ({
@@ -31,7 +33,7 @@ vi.mock('@/shared/utils/exportZip', () => ({
 
 vi.mock('@/shared/utils/downloadBlob', () => ({
   canvasToBlob: canvasToBlobMock,
-  downloadBlob: vi.fn(),
+  downloadBlob: downloadBlobMock,
 }))
 
 vi.mock('@/features/borders/components/BrowseWorkspace', () => ({
@@ -433,6 +435,118 @@ describe('BorderToolPage workspace', () => {
     })
 
     expect(exportZipMock).not.toHaveBeenCalled()
+  })
+
+  it('uses the filename pattern for single exports', async () => {
+    window.localStorage.setItem(
+      'photomoat-export-settings',
+      JSON.stringify({ filenamePattern: '{name}-{date}' }),
+    )
+    useImageQueueMock.mockReturnValue({
+      items: [createItem('1', 'one.jpg')],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Export image' }))
+
+    await waitFor(() => {
+      expect(downloadBlobMock).toHaveBeenCalled()
+    })
+
+    const [, filename] = downloadBlobMock.mock.calls[0]
+    expect(filename).toMatch(/^one-\d{4}-\d{2}-\d{2}\.png$/)
+  })
+
+  it('uses the folder name for the zip archive name', async () => {
+    window.localStorage.setItem(
+      'photomoat-export-settings',
+      JSON.stringify({ folderName: 'holiday-2026' }),
+    )
+    useImageQueueMock.mockReturnValue({
+      items: [createItem('1', 'one.jpg'), createItem('2', 'two.jpg')],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Export ZIP' }))
+
+    await waitFor(() => {
+      expect(exportZipMock).toHaveBeenCalled()
+    })
+
+    expect(exportZipMock.mock.calls[0][0].zipFilename).toBe('holiday-2026.zip')
+  })
+
+  it('applies the filename pattern to zip entries', async () => {
+    window.localStorage.setItem(
+      'photomoat-export-settings',
+      JSON.stringify({ filenamePattern: '{name}-{time}' }),
+    )
+
+    const entryFilenames: string[] = []
+    exportZipMock.mockImplementation(
+      async ({
+        items,
+        createEntry,
+      }: {
+        items: ImageQueueItem[]
+        createEntry: (item: ImageQueueItem) => Promise<{ filename: string }>
+      }) => {
+        for (const item of items) {
+          const entry = await createEntry(item)
+          entryFilenames.push(entry.filename)
+        }
+      },
+    )
+
+    useImageQueueMock.mockReturnValue({
+      items: [createItem('1', 'one.jpg'), createItem('2', 'two.jpg')],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Export ZIP' }))
+
+    await waitFor(() => {
+      expect(entryFilenames).toHaveLength(2)
+    })
+
+    expect(entryFilenames[0]).toMatch(/^one-\d{6}\.png$/)
+    expect(entryFilenames[1]).toMatch(/^two-\d{6}\.png$/)
+  })
+
+  it('keeps the historical default filenames when settings are untouched', async () => {
+    useImageQueueMock.mockReturnValue({
+      items: [createItem('1', 'one.jpg')],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+
+    await userEvent.click(screen.getByRole('button', { name: 'Export image' }))
+
+    await waitFor(() => {
+      expect(downloadBlobMock).toHaveBeenCalled()
+    })
+
+    const [, filename] = downloadBlobMock.mock.calls[0]
+    expect(filename).toBe('one-bordered.png')
   })
 
   it('rotates the direct edit target from the inspect footer', async () => {

@@ -29,7 +29,7 @@ export function FilterControls({
 
   return (
     <div className="space-y-2">
-      <p className="text-xs font-medium uppercase tracking-wider text-muted">
+      <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
         Filters
       </p>
 
@@ -52,7 +52,7 @@ export function FilterControls({
           >
             <SelectValue>
               <div className="flex min-w-0 items-center gap-3">
-                <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted">
+                <span className="flex size-7 shrink-0 items-center justify-center rounded-md border border-border bg-background text-muted-foreground">
                   <FilterIcon />
                 </span>
                 <span className="truncate text-sm font-medium text-foreground">

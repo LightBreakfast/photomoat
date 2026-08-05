@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
 import { ScrubberInput } from '@/shared/components/ScrubberInput'
 
 const swatches = ['#ffffff', '#000000', '#f5f5f5', '#e2e2e2', '#d4d4d4', '#1a1a1a']
@@ -58,7 +59,7 @@ export function BorderControls({
   return (
     <div className="space-y-5">
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           Background
         </p>
         <div className="flex flex-wrap gap-1.5">
@@ -77,7 +78,7 @@ export function BorderControls({
               style={{ backgroundColor: swatch }}
             />
           ))}
-          <label className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border text-muted hover:text-foreground">
+          <label className="flex h-7 w-7 cursor-pointer items-center justify-center rounded-md border border-border text-muted-foreground hover:text-foreground">
             <Palette size={14} />
             <input
               type="color"
@@ -93,8 +94,7 @@ export function BorderControls({
             />
           </label>
         </div>
-        <input
-          type="text"
+        <Input
           value={backgroundColor}
           onChange={(event) => onBackgroundColorChange(event.target.value)}
           onBlur={(event) => onBackgroundColorCommit?.(event.currentTarget.value)}
@@ -104,18 +104,17 @@ export function BorderControls({
             }
           }}
           disabled={disabled}
-          className="w-full rounded-md border border-border bg-background px-2 py-1.5 text-sm disabled:cursor-not-allowed disabled:opacity-50"
           inputMode="text"
           aria-label="Background colour hex value"
         />
       </div>
 
       <div className="space-y-2">
-        <p className="text-xs font-medium uppercase tracking-wider text-muted">
+        <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">
           Image sizing
         </p>
         <label className="block space-y-1">
-          <span className="text-xs font-medium text-muted">Mode</span>
+          <span className="text-xs font-medium text-muted-foreground">Mode</span>
           <Select
             value={imageSizingMode}
             onValueChange={(value) => onImageSizingModeChange(value as ImageSizingMode)}

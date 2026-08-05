@@ -46,7 +46,7 @@
   --surface-foreground: hsl(220 14% 14%);
   --surface-muted: hsl(220 14% 96%);
   --border: hsl(220 12% 65%);
-  --muted: hsl(220 10% 40%);
+  --muted: hsl(220 14% 96%);
   --muted-foreground: hsl(220 10% 40%);
   --accent: hsl(220 14% 42%);
   --accent-foreground: hsl(0 0% 100%);
@@ -73,7 +73,7 @@
   --surface-foreground: hsl(220 12% 88%);
   --surface-muted: hsl(220 12% 12%);
   --border: hsl(220 10% 35%);
-  --muted: hsl(220 10% 62%);
+  --muted: hsl(220 12% 12%);
   --muted-foreground: hsl(220 10% 62%);
   --accent: hsl(220 14% 68%);
   --accent-foreground: hsl(220 14% 14%);
@@ -131,12 +131,11 @@
   }
 }
 
-/* App-wide scrollbar standard: thin hairline scrollbar with a stable gutter,
- * so content never shifts when a scrollbar appears. */
+/* App-wide scrollbar standard: thin hairline scrollbars without reserving
+ * an empty gutter when a scroll container has no scrollbar. */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--border) transparent;
-  scrollbar-gutter: stable;
 }
 
 *::-webkit-scrollbar {
