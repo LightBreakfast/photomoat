@@ -30,3 +30,6 @@ PLANS/
 *.njsproj
 *.sln
 *.sw?
+
+# Agent workspace
+.pi/

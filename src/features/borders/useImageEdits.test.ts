@@ -376,4 +376,72 @@ describe('useImageEdits batch patches', () => {
     expect(result.current.getTimeline('a')?.entries).toHaveLength(1)
     expect(result.current.getTimeline('b')?.entries).toHaveLength(1)
   })
+
+  it('hydrate replaces all edit state', () => {
+    const { result } = renderHook(() => useImageEdits(defaultRecipe))
+
+    act(() => {
+      result.current.initializeImages(['a'])
+      result.current.hydrate({
+        b: {
+          past: [],
+          present: {
+            recipe: { ...emberRecipe, rotationDegrees: 90 },
+            label: 'Rotate 90° CW',
+            timestamp: 42,
+          },
+          future: [],
+        },
+      })
+    })
+
+    expect(result.current.getRecipe('a')).toEqual(defaultRecipe)
+    expect(result.current.getRecipe('b')).toMatchObject({ filterPresetId: 'ember', rotationDegrees: 90 })
+    expect(result.current.getTimeline('b')?.entries[0].label).toBe('Rotate 90° CW')
+  })
+
+  it('hydrate drops the transient working overlay', () => {
+    const { result } = renderHook(() => useImageEdits(defaultRecipe))
+
+    act(() => {
+      result.current.hydrate({
+        a: {
+          past: [],
+          present: {
+            recipe: defaultRecipe,
+            label: 'Original',
+            timestamp: 1,
+          },
+          future: [],
+          working: { rotationDegrees: 180 },
+        },
+      })
+    })
+
+    expect(result.current.getRecipe('a').rotationDegrees).toBe(0)
+    expect(result.current.getTimeline('a')?.entries).toHaveLength(1)
+  })
+
+  it('hydrate merges recipes over defaults so new fields fall back safely', () => {
+    const { result } = renderHook(() => useImageEdits(defaultRecipe))
+
+    act(() => {
+      result.current.hydrate({
+        a: {
+          past: [],
+          present: {
+            recipe: { presetId: 'instagram-story' } as ImageEditRecipe,
+            label: 'Original',
+            timestamp: 1,
+          },
+          future: [],
+        },
+      })
+    })
+
+    const recipe = result.current.getRecipe('a')
+    expect(recipe.presetId).toBe('instagram-story')
+    expect(recipe.backgroundColor).toBe('#ffffff')
+    expect(recipe.filterPresetId).toBe('original')
+  })
 })

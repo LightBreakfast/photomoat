@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import type { PersistedQueueItem } from '@/shared/storage/types'
 import type { ImageDimensions, ImageQueueItem } from '@/shared/types'
 import { getImageDimensions } from '@/shared/utils/imageLoader'
 import { partitionImageFiles } from '@/shared/utils/imageValidation'
@@ -8,6 +9,8 @@ type UseImageQueueOptions = {
   loadDimensions?: (file: File, objectUrl: string) => Promise<ImageDimensions>
   createObjectUrl?: (file: File) => string
   revokeObjectUrl?: (objectUrl: string) => void
+  persistImage?: (record: { id: string; file: File }) => Promise<boolean | void>
+  deletePersistedImage?: (id: string) => Promise<boolean | void>
 }
 
 const defaultCreateObjectUrl = (file: File) => URL.createObjectURL(file)
@@ -29,6 +32,8 @@ export function useImageQueue({
   loadDimensions = getImageDimensions,
   createObjectUrl = defaultCreateObjectUrl,
   revokeObjectUrl = defaultRevokeObjectUrl,
+  persistImage,
+  deletePersistedImage,
 }: UseImageQueueOptions = {}) {
   const [items, setItems] = useState<ImageQueueItem[]>([])
   const [message, setMessage] = useState<string | null>(null)
@@ -79,6 +84,7 @@ export function useImageQueue({
           | 'image/png'
           | 'image/jpeg',
         status: 'pending' as const,
+        persisted: persistImage ? false : true,
       }))
 
       if (queuedItems.length === 0) {
@@ -87,6 +93,10 @@ export function useImageQueue({
 
       itemsRef.current = [...itemsRef.current, ...queuedItems]
       setItems((currentItems) => [...currentItems, ...queuedItems])
+
+      const persistPromise = persistImage
+        ? Promise.allSettled(queuedItems.map((item) => persistImage({ id: item.id, file: item.file })))
+        : null
 
       await Promise.all(
         queuedItems.map(async (item) => {
@@ -109,9 +119,39 @@ export function useImageQueue({
         }),
       )
 
+      if (persistPromise) {
+        const results = await persistPromise
+        let persistenceFailed = false
+        let deletionFailed = false
+        for (const [index, result] of results.entries()) {
+          const persisted = result.status === 'fulfilled' && result.value !== false
+          if (!persisted) {
+            persistenceFailed = true
+          }
+          const item = queuedItems[index]
+          if (!item) {
+            continue
+          }
+          if (!itemsRef.current.some((currentItem) => currentItem.id === item.id)) {
+            try {
+              deletionFailed ||= (await deletePersistedImage?.(item.id)) === false
+            } catch {
+              deletionFailed = true
+            }
+            continue
+          }
+          updateItem(item.id, (currentItem) => ({ ...currentItem, persisted }))
+        }
+        if (persistenceFailed) {
+          setMessage('Some images could not be saved for later.')
+        } else if (deletionFailed) {
+          setMessage('Saved image data could not be removed.')
+        }
+      }
+
       return queuedItems
     },
-    [createObjectUrl, loadDimensions, updateItem],
+    [createObjectUrl, deletePersistedImage, loadDimensions, persistImage, updateItem],
   )
 
   const removeItem = useCallback(
@@ -128,8 +168,19 @@ export function useImageQueue({
 
         return nextItems
       })
+      if (deletePersistedImage) {
+        void deletePersistedImage(id)
+          .then((deleted) => {
+            if (deleted === false) {
+              setMessage('Saved image data could not be removed.')
+            }
+          })
+          .catch(() => {
+            setMessage('Saved image data could not be removed.')
+          })
+      }
     },
-    [revokeObjectUrl],
+    [deletePersistedImage, revokeObjectUrl],
   )
 
   const clearItems = useCallback(() => {
@@ -151,6 +202,70 @@ export function useImageQueue({
     [updateItem],
   )
 
+  const restoreItems = useCallback(
+    async (
+      records: PersistedQueueItem[],
+      loadFile: (id: string) => Promise<File | null>,
+    ): Promise<ImageQueueItem[]> => {
+      for (const item of itemsRef.current) {
+        revokeObjectUrl(item.objectUrl)
+      }
+      const restored: ImageQueueItem[] = []
+
+      for (const record of records) {
+        const file = await loadFile(record.id)
+
+        if (!file) {
+          restored.push({
+            id: record.id,
+            file: new File([], record.filename, { type: record.mimeType }),
+            objectUrl: '',
+            filename: record.filename,
+            mimeType: record.mimeType,
+            status: 'error',
+            error: 'Saved image data is no longer available.',
+            persisted: false,
+          })
+          continue
+        }
+
+        const objectUrl = createObjectUrl(file)
+        const item: ImageQueueItem = {
+          id: record.id,
+          file,
+          objectUrl,
+          filename: record.filename,
+          mimeType: record.mimeType,
+          status: 'ready',
+          error: undefined,
+          persisted: true,
+        }
+
+        if (record.originalWidth !== undefined && record.originalHeight !== undefined) {
+          item.originalWidth = record.originalWidth
+          item.originalHeight = record.originalHeight
+        } else {
+          try {
+            const dimensions = await loadDimensions(file, objectUrl)
+            item.status = 'ready'
+            item.originalWidth = dimensions.width
+            item.originalHeight = dimensions.height
+          } catch {
+            item.status = 'error'
+            item.error = 'This image could not be loaded.'
+          }
+        }
+
+        restored.push(item)
+      }
+
+      itemsRef.current = restored
+      setItems(restored)
+      return restored
+    },
+    [createObjectUrl, loadDimensions, revokeObjectUrl],
+  )
+
   return {
     items,
     message,
@@ -159,5 +274,6 @@ export function useImageQueue({
     clearItems,
     setItemStatus,
     setMessage,
+    restoreItems,
   }
 }

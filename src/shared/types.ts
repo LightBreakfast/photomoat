@@ -28,6 +28,7 @@ export type ImageQueueItem = {
   originalHeight?: number
   status: ImageQueueStatus
   error?: string
+  persisted?: boolean
 }
 
 export type ImageDimensions = {

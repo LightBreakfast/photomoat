@@ -39,4 +39,16 @@ describe('Dropzone', () => {
 
     expect(clickSpy).toHaveBeenCalled()
   })
+
+  it('does not accept files while disabled', () => {
+    const onFilesAccepted = vi.fn()
+    render(<Dropzone onFilesAccepted={onFilesAccepted} disabled />)
+
+    const input = screen.getByLabelText(/choose files/i, { selector: 'input' })
+    expect(input).toBeDisabled()
+    expect(screen.getByRole('button')).toHaveAttribute('aria-disabled', 'true')
+
+    fireEvent.change(input, { target: { files: [jpgFile] } })
+    expect(onFilesAccepted).not.toHaveBeenCalled()
+  })
 })
