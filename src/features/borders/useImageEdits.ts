@@ -12,6 +12,7 @@ import type {
 
 type ImageEditsAction =
   | { type: 'initialize-images'; imageIds: string[]; recipe: ImageEditRecipe }
+  | { type: 'hydrate'; byId: Record<string, ImageHistory> }
   | { type: 'remove-image'; imageId: string }
   | { type: 'remove-images'; imageIds: string[] }
   | { type: 'commit-patch'; imageId: string; patch: Partial<ImageEditRecipe>; label?: string }
@@ -93,6 +94,10 @@ function reducer(state: ImageEditsState, action: ImageEditsAction): ImageEditsSt
         }
       }
       return { byId: next }
+    }
+
+    case 'hydrate': {
+      return { byId: action.byId }
     }
 
     case 'remove-image': {
@@ -303,6 +308,35 @@ export function useImageEdits(initialRecipe: ImageEditRecipe) {
     [initialRecipe],
   )
 
+  /**
+   * Replace all edit state with a persisted session's histories. Recipes are
+   * merged over the current defaults so future recipe fields fall back safely;
+   * the transient `working` overlay is never restored.
+   */
+  const hydrate = useCallback(
+    (byId: Record<string, ImageHistory>) => {
+      const sanitized: Record<string, ImageHistory> = {}
+
+      for (const [id, history] of Object.entries(byId)) {
+        if (!history || !history.present) {
+          continue
+        }
+        const withDefaults = (entry: EditHistoryEntry): EditHistoryEntry => ({
+          ...entry,
+          recipe: { ...initialRecipe, ...entry.recipe },
+        })
+        sanitized[id] = {
+          past: Array.isArray(history.past) ? history.past.map(withDefaults) : [],
+          present: withDefaults(history.present),
+          future: Array.isArray(history.future) ? history.future.map(withDefaults) : [],
+        }
+      }
+
+      dispatch({ type: 'hydrate', byId: sanitized })
+    },
+    [initialRecipe],
+  )
+
   const removeImage = useCallback((imageId: string) => {
     dispatch({ type: 'remove-image', imageId })
   }, [])
@@ -391,6 +425,7 @@ export function useImageEdits(initialRecipe: ImageEditRecipe) {
   return {
     recipesById: state.byId,
     initializeImages,
+    hydrate,
     removeImage,
     removeImages,
     patchImage,

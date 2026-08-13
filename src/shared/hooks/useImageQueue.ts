@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import type { PersistedQueueItem } from '@/shared/storage/types'
 import type { ImageDimensions, ImageQueueItem } from '@/shared/types'
 import { getImageDimensions } from '@/shared/utils/imageLoader'
 import { partitionImageFiles } from '@/shared/utils/imageValidation'
@@ -8,6 +9,12 @@ type UseImageQueueOptions = {
   loadDimensions?: (file: File, objectUrl: string) => Promise<ImageDimensions>
   createObjectUrl?: (file: File) => string
   revokeObjectUrl?: (objectUrl: string) => void
+  /**
+   * Write-through hook: called once per added file so the caller can persist
+   * the bytes (e.g. to IndexedDB). Failures are reported but never block the
+   * add — the app keeps working in memory.
+   */
+  persistImage?: (record: { id: string; file: File }) => Promise<void>
 }
 
 const defaultCreateObjectUrl = (file: File) => URL.createObjectURL(file)
@@ -29,6 +36,7 @@ export function useImageQueue({
   loadDimensions = getImageDimensions,
   createObjectUrl = defaultCreateObjectUrl,
   revokeObjectUrl = defaultRevokeObjectUrl,
+  persistImage,
 }: UseImageQueueOptions = {}) {
   const [items, setItems] = useState<ImageQueueItem[]>([])
   const [message, setMessage] = useState<string | null>(null)
@@ -88,6 +96,10 @@ export function useImageQueue({
       itemsRef.current = [...itemsRef.current, ...queuedItems]
       setItems((currentItems) => [...currentItems, ...queuedItems])
 
+      const persistPromise = persistImage
+        ? Promise.allSettled(queuedItems.map((item) => persistImage({ id: item.id, file: item.file })))
+        : null
+
       await Promise.all(
         queuedItems.map(async (item) => {
           try {
@@ -109,9 +121,16 @@ export function useImageQueue({
         }),
       )
 
+      if (persistPromise) {
+        const results = await persistPromise
+        if (results.some((result) => result.status === 'rejected')) {
+          setMessage('Some images could not be saved for later.')
+        }
+      }
+
       return queuedItems
     },
-    [createObjectUrl, loadDimensions, updateItem],
+    [createObjectUrl, loadDimensions, persistImage, updateItem],
   )
 
   const removeItem = useCallback(
@@ -151,6 +170,77 @@ export function useImageQueue({
     [updateItem],
   )
 
+  /**
+   * Rebuild the queue from a persisted session. Object URLs are recreated
+   * (they are invalid across sessions), missing file data becomes an error
+   * item, and missing dimensions are recomputed.
+   */
+  const restoreItems = useCallback(
+    async (
+      records: PersistedQueueItem[],
+      loadFile: (id: string) => Promise<File | null>,
+    ): Promise<ImageQueueItem[]> => {
+      const currentUrls = new Map(itemsRef.current.map((item) => [item.id, item.objectUrl]))
+      const restored: ImageQueueItem[] = []
+
+      for (const record of records) {
+        // Idempotent restore: revoke any object URL we are about to replace.
+        const existingUrl = currentUrls.get(record.id)
+        if (existingUrl) {
+          revokeObjectUrl(existingUrl)
+        }
+
+        const file = await loadFile(record.id)
+
+        if (!file) {
+          restored.push({
+            id: record.id,
+            file: new File([], record.filename, { type: record.mimeType }),
+            objectUrl: '',
+            filename: record.filename,
+            mimeType: record.mimeType,
+            status: 'error',
+            error: 'Saved image data is no longer available.',
+          })
+          continue
+        }
+
+        const objectUrl = createObjectUrl(file)
+        const item: ImageQueueItem = {
+          id: record.id,
+          file,
+          objectUrl,
+          filename: record.filename,
+          mimeType: record.mimeType,
+          status: record.status,
+          error: record.error,
+        }
+
+        if (record.originalWidth !== undefined && record.originalHeight !== undefined) {
+          item.originalWidth = record.originalWidth
+          item.originalHeight = record.originalHeight
+        } else {
+          try {
+            const dimensions = await loadDimensions(file, objectUrl)
+            item.status = 'ready'
+            item.originalWidth = dimensions.width
+            item.originalHeight = dimensions.height
+          } catch {
+            item.status = 'error'
+            item.error = 'This image could not be loaded.'
+          }
+        }
+
+        restored.push(item)
+      }
+
+      itemsRef.current = restored
+      setItems(restored)
+      return restored
+    },
+    [createObjectUrl, loadDimensions, revokeObjectUrl],
+  )
+
   return {
     items,
     message,
@@ -159,5 +249,6 @@ export function useImageQueue({
     clearItems,
     setItemStatus,
     setMessage,
+    restoreItems,
   }
 }
