@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 
-import { resetDB } from '@/shared/storage/db'
+import { getDB, resetDB } from '@/shared/storage/db'
 import {
   clearFiles,
   deleteImage,
@@ -62,14 +62,22 @@ describe('fileStore', () => {
     expect(await getImage('img-4')).not.toBeNull()
   })
 
-  it('clearFiles removes everything', async () => {
+  it('clearFiles removes only working-catalog files', async () => {
     await saveImage('img-5', makeFile('a.jpg'))
-    await saveImage('img-6', makeFile('b.jpg'))
+    const db = (await getDB())!
+    await db.put('files', {
+      id: 'named-1',
+      catalogId: 'named',
+      bytes: new ArrayBuffer(0),
+      name: 'b.jpg',
+      type: 'image/jpeg',
+      lastModified: 1234,
+    })
 
     await clearFiles()
 
     expect(await getImage('img-5')).toBeNull()
-    expect(await getImage('img-6')).toBeNull()
+    expect(await db.get('files', 'named-1')).toMatchObject({ catalogId: 'named' })
   })
 
   it('recordFromFile keeps the catalog id for tier-2 catalogs', async () => {

@@ -6,15 +6,19 @@ import { partitionImageFiles } from '@/shared/utils/imageValidation'
 type DropzoneProps = {
   onFilesAccepted: (files: File[]) => void | Promise<void>
   variant?: 'full' | 'compact'
+  disabled?: boolean
 }
 
-export function Dropzone({ onFilesAccepted, variant = 'full' }: DropzoneProps) {
+export function Dropzone({ onFilesAccepted, variant = 'full', disabled = false }: DropzoneProps) {
   const inputId = useId()
   const inputRef = useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleFileSelection = async (files: File[]) => {
+    if (disabled) {
+      return
+    }
     const { accepted, rejected } = partitionImageFiles(files)
 
     if (rejected.length > 0) {
@@ -29,7 +33,7 @@ export function Dropzone({ onFilesAccepted, variant = 'full' }: DropzoneProps) {
   }
 
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
+    if (!disabled && (event.key === 'Enter' || event.key === ' ')) {
       event.preventDefault()
       inputRef.current?.click()
     }
@@ -40,23 +44,29 @@ export function Dropzone({ onFilesAccepted, variant = 'full' }: DropzoneProps) {
       <div className="space-y-2">
         <div
           role="button"
-          tabIndex={0}
+          tabIndex={disabled ? -1 : 0}
           aria-label="Choose files or drop images"
-          onClick={() => inputRef.current?.click()}
+          aria-disabled={disabled}
+          onClick={() => !disabled && inputRef.current?.click()}
           onKeyDown={handleKeyDown}
           onDragOver={(event) => {
             event.preventDefault()
-            setIsDragging(true)
+            if (!disabled) {
+              setIsDragging(true)
+            }
           }}
           onDragLeave={() => setIsDragging(false)}
           onDrop={async (event) => {
             event.preventDefault()
             setIsDragging(false)
-            await handleFileSelection(Array.from(event.dataTransfer.files))
+            if (!disabled) {
+              await handleFileSelection(Array.from(event.dataTransfer.files))
+            }
           }}
           className={[
-            'flex cursor-pointer flex-col items-center gap-2 rounded-lg border border-dashed p-4 text-center',
-            isDragging ? 'border-accent bg-surface-muted' : 'border-border',
+            'flex flex-col items-center gap-2 rounded-lg border border-dashed p-4 text-center',
+            disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+            isDragging && !disabled ? 'border-accent bg-surface-muted' : 'border-border',
           ].join(' ')}
         >
           <input
@@ -65,6 +75,7 @@ export function Dropzone({ onFilesAccepted, variant = 'full' }: DropzoneProps) {
             type="file"
             accept=".jpg,.jpeg,.png,image/jpeg,image/png"
             multiple
+            disabled={disabled}
             aria-label="Choose files"
             className="sr-only"
             onChange={async (event) => {
@@ -88,24 +99,30 @@ export function Dropzone({ onFilesAccepted, variant = 'full' }: DropzoneProps) {
     <div className="space-y-2">
       <div
         role="button"
-        tabIndex={0}
+        tabIndex={disabled ? -1 : 0}
         aria-label="Choose files or drop images"
+        aria-disabled={disabled}
         aria-describedby={error ? `${inputId}-error` : undefined}
-        onClick={() => inputRef.current?.click()}
+        onClick={() => !disabled && inputRef.current?.click()}
         onKeyDown={handleKeyDown}
         onDragOver={(event) => {
           event.preventDefault()
-          setIsDragging(true)
+          if (!disabled) {
+            setIsDragging(true)
+          }
         }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={async (event) => {
           event.preventDefault()
           setIsDragging(false)
-          await handleFileSelection(Array.from(event.dataTransfer.files))
+          if (!disabled) {
+            await handleFileSelection(Array.from(event.dataTransfer.files))
+          }
         }}
         className={[
-          'flex cursor-pointer items-center gap-3 rounded-md border border-dashed px-4 py-6',
-          isDragging ? 'border-accent bg-surface-muted' : 'border-border',
+          'flex items-center gap-3 rounded-md border border-dashed px-4 py-6',
+          disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer',
+          isDragging && !disabled ? 'border-accent bg-surface-muted' : 'border-border',
         ].join(' ')}
       >
         <input
@@ -114,6 +131,7 @@ export function Dropzone({ onFilesAccepted, variant = 'full' }: DropzoneProps) {
           type="file"
           accept=".jpg,.jpeg,.png,image/jpeg,image/png"
           multiple
+          disabled={disabled}
           aria-label="Choose files"
           className="sr-only"
           onChange={async (event) => {

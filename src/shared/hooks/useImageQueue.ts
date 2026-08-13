@@ -10,6 +10,7 @@ type UseImageQueueOptions = {
   createObjectUrl?: (file: File) => string
   revokeObjectUrl?: (objectUrl: string) => void
   persistImage?: (record: { id: string; file: File }) => Promise<boolean | void>
+  deletePersistedImage?: (id: string) => Promise<boolean | void>
 }
 
 const defaultCreateObjectUrl = (file: File) => URL.createObjectURL(file)
@@ -32,6 +33,7 @@ export function useImageQueue({
   createObjectUrl = defaultCreateObjectUrl,
   revokeObjectUrl = defaultRevokeObjectUrl,
   persistImage,
+  deletePersistedImage,
 }: UseImageQueueOptions = {}) {
   const [items, setItems] = useState<ImageQueueItem[]>([])
   const [message, setMessage] = useState<string | null>(null)
@@ -120,24 +122,36 @@ export function useImageQueue({
       if (persistPromise) {
         const results = await persistPromise
         let persistenceFailed = false
-        results.forEach((result, index) => {
+        let deletionFailed = false
+        for (const [index, result] of results.entries()) {
           const persisted = result.status === 'fulfilled' && result.value !== false
           if (!persisted) {
             persistenceFailed = true
           }
           const item = queuedItems[index]
-          if (item) {
-            updateItem(item.id, (currentItem) => ({ ...currentItem, persisted }))
+          if (!item) {
+            continue
           }
-        })
+          if (!itemsRef.current.some((currentItem) => currentItem.id === item.id)) {
+            try {
+              deletionFailed ||= (await deletePersistedImage?.(item.id)) === false
+            } catch {
+              deletionFailed = true
+            }
+            continue
+          }
+          updateItem(item.id, (currentItem) => ({ ...currentItem, persisted }))
+        }
         if (persistenceFailed) {
           setMessage('Some images could not be saved for later.')
+        } else if (deletionFailed) {
+          setMessage('Saved image data could not be removed.')
         }
       }
 
       return queuedItems
     },
-    [createObjectUrl, loadDimensions, persistImage, updateItem],
+    [createObjectUrl, deletePersistedImage, loadDimensions, persistImage, updateItem],
   )
 
   const removeItem = useCallback(
@@ -154,8 +168,19 @@ export function useImageQueue({
 
         return nextItems
       })
+      if (deletePersistedImage) {
+        void deletePersistedImage(id)
+          .then((deleted) => {
+            if (deleted === false) {
+              setMessage('Saved image data could not be removed.')
+            }
+          })
+          .catch(() => {
+            setMessage('Saved image data could not be removed.')
+          })
+      }
     },
-    [revokeObjectUrl],
+    [deletePersistedImage, revokeObjectUrl],
   )
 
   const clearItems = useCallback(() => {
@@ -182,15 +207,12 @@ export function useImageQueue({
       records: PersistedQueueItem[],
       loadFile: (id: string) => Promise<File | null>,
     ): Promise<ImageQueueItem[]> => {
-      const currentUrls = new Map(itemsRef.current.map((item) => [item.id, item.objectUrl]))
+      for (const item of itemsRef.current) {
+        revokeObjectUrl(item.objectUrl)
+      }
       const restored: ImageQueueItem[] = []
 
       for (const record of records) {
-        const existingUrl = currentUrls.get(record.id)
-        if (existingUrl) {
-          revokeObjectUrl(existingUrl)
-        }
-
         const file = await loadFile(record.id)
 
         if (!file) {

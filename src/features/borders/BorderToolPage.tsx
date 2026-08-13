@@ -91,6 +91,7 @@ export function BorderToolPage() {
   const { items, message, addFiles, removeItem, setItemStatus, restoreItems } =
     useImageQueue({
       persistImage: ({ id, file }) => saveImage(id, file),
+      deletePersistedImage: deleteImage,
     })
 
   const [workspaceMode, setWorkspaceMode] = useState<'browse' | 'inspect'>('browse')
@@ -153,15 +154,18 @@ export function BorderToolPage() {
 
   const handleAddFiles = useCallback(
     async (files: File[]) => {
+      if (isRestoring) {
+        return
+      }
       const shouldStartFresh =
         persistenceStatus.status === 'offer-restore' ||
         (persistenceStatus.status === 'idle' && items.length === 0)
-      if (shouldStartFresh) {
-        await startFresh()
+      if (shouldStartFresh && !(await startFresh())) {
+        return
       }
       await addFiles(files)
     },
-    [items.length, persistenceStatus.status, startFresh, addFiles],
+    [addFiles, isRestoring, items.length, persistenceStatus.status, startFresh],
   )
 
   const readyItems = useMemo(
@@ -682,7 +686,6 @@ export function BorderToolPage() {
 
   const handleRemoveItem = (id: string) => {
     removeItem(id)
-    void deleteImage(id).catch(() => {})
     setSelectedIds((prev) => {
       if (!prev.has(id)) {
         return prev
@@ -886,6 +889,7 @@ export function BorderToolPage() {
         </p>
         <Dropzone
           variant="compact"
+          disabled={isRestoring}
           onFilesAccepted={async (files) => {
             await handleAddFiles(files)
             setMobilePanel('none')
@@ -1022,6 +1026,7 @@ export function BorderToolPage() {
             <div className="flex flex-1 items-center justify-center">
               <Dropzone
                 variant="full"
+                disabled={isRestoring}
                 onFilesAccepted={async (files) => {
                   await handleAddFiles(files)
                 }}

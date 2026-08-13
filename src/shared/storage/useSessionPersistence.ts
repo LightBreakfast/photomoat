@@ -143,13 +143,16 @@ export function useSessionPersistence({
   }, [status, onRestore])
 
   const dismiss = useCallback(() => {
-    if (status.status !== 'offer-restore') {
+    if (status.status !== 'offer-restore' || restoringRef.current) {
       return
     }
     setStatus({ status: 'idle' })
   }, [status])
 
-  const startFresh = useCallback(async () => {
+  const startFresh = useCallback(async (): Promise<boolean> => {
+    if (restoringRef.current) {
+      return false
+    }
     userStartedRef.current = true
     await (initialLoadRef.current ?? Promise.resolve())
 
@@ -160,15 +163,20 @@ export function useSessionPersistence({
     storedSessionExistsRef.current = false
     setStatus({ status: 'active' })
     void requestPersistence()
+    return true
   }, [])
 
-  const clearLibrary = useCallback(async () => {
+  const clearLibrary = useCallback(async (): Promise<boolean> => {
+    if (restoringRef.current) {
+      return false
+    }
     const [sessionCleared, filesCleared] = await Promise.all([clearSession(), clearFiles()])
     if (!sessionCleared || !filesCleared) {
       setPersistenceWarning('Session storage could not be cleared.')
     }
     storedSessionExistsRef.current = false
     setStatus({ status: 'idle' })
+    return sessionCleared && filesCleared
   }, [])
 
   useEffect(() => {

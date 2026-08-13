@@ -413,6 +413,35 @@ describe('useSessionPersistence', () => {
     expect((await loadSession())?.items.map((item) => item.id)).toEqual(['img-1'])
   })
 
+  it('does not start fresh while restoration is in flight', async () => {
+    const session = makeSession()
+    await saveSession(session)
+
+    let resolveRestore!: () => void
+    const onRestore = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRestore = resolve
+        }),
+    )
+    const { result } = setupHook([], onRestore)
+    await flush()
+
+    let restorePromise!: Promise<void>
+    act(() => {
+      restorePromise = result.current.acceptRestore()
+    })
+
+    expect(await result.current.startFresh()).toBe(false)
+    expect(await result.current.clearLibrary()).toBe(false)
+    expect(await loadSession()).toEqual(session)
+
+    await act(async () => {
+      resolveRestore()
+      await restorePromise
+    })
+  })
+
   it('ignores a second restore while one is already in flight', async () => {
     const session = makeSession()
     await saveSession(session)

@@ -168,6 +168,68 @@ describe('useImageQueue', () => {
     expect(result.current.items[0]).toMatchObject({ persisted: true })
   })
 
+  it('cleans up a file that is removed before its write finishes', async () => {
+    let resolvePersist!: (value: boolean) => void
+    const persistImage = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolvePersist = resolve
+        }),
+    )
+    const deletePersistedImage = vi.fn().mockResolvedValue(true)
+    const { result } = renderHook(() =>
+      useImageQueue({
+        loadDimensions: vi.fn().mockResolvedValue({ width: 1000, height: 1000 }),
+        createObjectUrl: (file) => `blob:${file.name}`,
+        revokeObjectUrl: vi.fn(),
+        persistImage,
+        deletePersistedImage,
+      }),
+    )
+
+    let addPromise!: Promise<unknown>
+    await act(async () => {
+      addPromise = result.current.addFiles([jpgFile])
+      await Promise.resolve()
+    })
+
+    const id = result.current.items[0].id
+    act(() => {
+      result.current.removeItem(id)
+    })
+
+    await act(async () => {
+      resolvePersist(true)
+      await addPromise
+    })
+
+    expect(deletePersistedImage).toHaveBeenCalledTimes(2)
+    expect(deletePersistedImage).toHaveBeenLastCalledWith(id)
+  })
+
+  it('reports when saved image data cannot be removed', async () => {
+    const { result } = renderHook(() =>
+      useImageQueue({
+        loadDimensions: vi.fn().mockResolvedValue({ width: 1000, height: 1000 }),
+        createObjectUrl: (file) => `blob:${file.name}`,
+        revokeObjectUrl: vi.fn(),
+        deletePersistedImage: vi.fn().mockResolvedValue(false),
+      }),
+    )
+
+    await act(async () => {
+      await result.current.addFiles([jpgFile])
+    })
+    act(() => {
+      result.current.removeItem(result.current.items[0].id)
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(result.current.message).toBe('Saved image data could not be removed.')
+  })
+
   it('reports persistence failures without failing the add', async () => {
     const persistImage = vi
       .fn()

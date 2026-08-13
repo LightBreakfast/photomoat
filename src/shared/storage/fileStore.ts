@@ -79,7 +79,14 @@ export async function clearFiles(): Promise<boolean> {
     if (!connection) {
       return false
     }
-    await connection.clear('files')
+    const tx = connection.transaction('files', 'readwrite')
+    const byCatalog = tx.store.index('by-catalog')
+    let cursor = await byCatalog.openCursor(WORKING_CATALOG_ID)
+    while (cursor) {
+      await cursor.delete()
+      cursor = await cursor.continue()
+    }
+    await tx.done
     return true
   } catch {
     return false
