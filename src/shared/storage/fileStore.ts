@@ -1,0 +1,58 @@
+import { getDB } from '@/shared/storage/db'
+import { WORKING_CATALOG_ID, type PersistedFileRecord } from '@/shared/storage/types'
+
+/**
+ * Build a `PersistedFileRecord` from a dropped-in `File`. The bytes are read
+ * into an `ArrayBuffer` and name/type/lastModified are kept as separate
+ * fields, so `fileFromRecord` can rebuild an identical `File` on restore.
+ */
+export async function recordFromFile(id: string, file: File): Promise<PersistedFileRecord> {
+  return {
+    id,
+    catalogId: WORKING_CATALOG_ID,
+    bytes: await file.arrayBuffer(),
+    name: file.name,
+    type: file.type,
+    lastModified: file.lastModified,
+  }
+}
+
+/** Rebuild a `File` from a stored record (object URLs are created by the caller). */
+export function fileFromRecord(record: PersistedFileRecord): File {
+  return new File([record.bytes], record.name, {
+    type: record.type,
+    lastModified: record.lastModified,
+  })
+}
+
+export async function saveImage(id: string, file: File): Promise<void> {
+  const db = getDB()
+  if (!db) {
+    return
+  }
+  await (await db).put('files', await recordFromFile(id, file))
+}
+
+export async function getImage(id: string): Promise<PersistedFileRecord | null> {
+  const db = getDB()
+  if (!db) {
+    return null
+  }
+  return ((await (await db).get('files', id)) ?? null) as PersistedFileRecord | null
+}
+
+export async function deleteImage(id: string): Promise<void> {
+  const db = getDB()
+  if (!db) {
+    return
+  }
+  await (await db).delete('files', id)
+}
+
+export async function clearFiles(): Promise<void> {
+  const db = getDB()
+  if (!db) {
+    return
+  }
+  await (await db).clear('files')
+}
