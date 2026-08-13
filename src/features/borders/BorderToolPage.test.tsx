@@ -878,6 +878,30 @@ describe('BorderToolPage workspace', () => {
     )
   })
 
+  it('persists a UI-only workspace mode change after the debounce', async () => {
+    useImageQueueMock.mockReturnValue({
+      items: [createItem('1', 'one.jpg')],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+
+    // Wait for the initial save (queue present → persistence auto-starts).
+    await new Promise((resolve) => setTimeout(resolve, 600))
+    await userEvent.click(screen.getByRole('button', { name: 'Inspect image' }))
+
+    // A UI-only change must re-schedule the debounced save on its own.
+    await new Promise((resolve) => setTimeout(resolve, 600))
+
+    const saved = await loadSession()
+    expect(saved?.items).toHaveLength(1)
+    expect(saved?.ui.workspaceMode).toBe('inspect')
+    expect(saved?.ui.activeItemId).toBe('1')
+  })
+
   it('clear saved wipes the stored session', async () => {
     await saveSession(makeSession())
 

@@ -104,24 +104,18 @@ export function BorderToolPage() {
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
   const [isCompareActive, setIsCompareActive] = useState(false)
 
-  // Latest UI session state, kept fresh for session persistence.
-  const uiStateRef = useRef<PersistedUiState>({
-    workspaceMode: 'browse',
-    activeItemId: null,
-    selectedIds: [],
-    inspectZoom: { mode: 'fit' },
-    columns: 3,
-  })
-
-  useEffect(() => {
-    uiStateRef.current = {
+  // Latest UI session state, memoized so a UI-only change re-schedules the
+  // debounced persistence save even when the queue and recipes are unchanged.
+  const uiState = useMemo<PersistedUiState>(
+    () => ({
       workspaceMode,
       activeItemId,
       selectedIds: [...selectedIds],
       inspectZoom,
       columns,
-    }
-  }, [workspaceMode, activeItemId, selectedIds, inspectZoom, columns])
+    }),
+    [workspaceMode, activeItemId, selectedIds, inspectZoom, columns],
+  )
 
   // --- Session persistence ---
   const handleRestore = useCallback(
@@ -147,6 +141,7 @@ export function BorderToolPage() {
   const {
     status: persistenceStatus,
     storageUsage,
+    isRestoring,
     acceptRestore,
     dismiss,
     startFresh,
@@ -154,7 +149,7 @@ export function BorderToolPage() {
   } = useSessionPersistence({
     items,
     recipesById,
-    uiStateRef,
+    uiState,
     onRestore: handleRestore,
   })
 
@@ -687,7 +682,7 @@ export function BorderToolPage() {
 
   const handleRemoveItem = (id: string) => {
     removeItem(id)
-    void deleteImage(id)
+    void deleteImage(id).catch(() => {})
     setSelectedIds((prev) => {
       if (!prev.has(id)) {
         return prev
@@ -991,6 +986,7 @@ export function BorderToolPage() {
                     ? `${formatBytes(storageUsage.usage)} of ${formatBytes(storageUsage.quota)}`
                     : undefined
                 }
+                isRestoring={isRestoring}
                 onRestore={() => void acceptRestore()}
                 onClear={() => void clearLibrary()}
                 onDismiss={dismiss}

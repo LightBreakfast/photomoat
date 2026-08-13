@@ -206,14 +206,18 @@ export function useImageQueue({
         }
 
         const objectUrl = createObjectUrl(file)
+        // A stored `error` is only trustworthy when the source can't be
+        // verified. Once the file is back and its dimensions are known the
+        // source is usable, so transient failures (a failed export, a one-off
+        // decode hiccup) must not stick to a good image after a refresh.
         const item: ImageQueueItem = {
           id: record.id,
           file,
           objectUrl,
           filename: record.filename,
           mimeType: record.mimeType,
-          status: record.status,
-          error: record.error,
+          status: 'ready',
+          error: undefined,
         }
 
         if (record.originalWidth !== undefined && record.originalHeight !== undefined) {

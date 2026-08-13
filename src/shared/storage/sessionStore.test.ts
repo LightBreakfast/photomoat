@@ -1,6 +1,8 @@
-import { beforeEach, describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { defaultImageRecipe } from '@/features/borders/defaultImageRecipe'
 import { getDB, resetDB } from '@/shared/storage/db'
+import { getImage, saveImage } from '@/shared/storage/fileStore'
 import {
   clearSession,
   loadSession,
@@ -30,13 +32,13 @@ function makeSession(overrides: Partial<PersistedSession> = {}): PersistedSessio
       'img-1': {
         past: [
           {
-            recipe: { presetId: 'instagram-square', backgroundColor: '#ffffff' } as never,
+            recipe: { ...defaultImageRecipe, presetId: 'instagram-square' },
             label: 'Original',
             timestamp: 1_700_000_000_000,
           },
         ],
         present: {
-          recipe: { presetId: 'instagram-square' } as never,
+          recipe: { ...defaultImageRecipe, presetId: 'instagram-square' },
           label: 'Preset: Square',
           timestamp: 1_700_000_000_001,
         },
@@ -77,6 +79,29 @@ describe('sessionStore', () => {
 
     expect(await loadSession()).toBeNull()
     expect(await db.get('kv', 'session')).toBeUndefined()
+  })
+
+  it('clears stored image files together with an invalid session', async () => {
+    const db = (await getDB())!
+    await db.put('kv', { ...makeSession(), schemaVersion: 999 }, 'session')
+    await saveImage('img-1', new File(['x'], 'beach.jpg', { type: 'image/jpeg' }))
+
+    expect(await loadSession()).toBeNull()
+    expect(await db.get('kv', 'session')).toBeUndefined()
+    expect(await getImage('img-1')).toBeNull()
+  })
+
+  it('degrades to in-memory when IndexedDB is unavailable', async () => {
+    vi.stubGlobal('indexedDB', undefined)
+    try {
+      await saveSession(makeSession())
+      expect(await loadSession()).toBeNull()
+      await saveImage('img-1', new File(['x'], 'beach.jpg', { type: 'image/jpeg' }))
+      expect(await getImage('img-1')).toBeNull()
+      await clearSession()
+    } finally {
+      vi.unstubAllGlobals()
+    }
   })
 
   it('clears and returns null for non-object data', async () => {
@@ -165,5 +190,79 @@ describe('sessionStore', () => {
     expect(sanitized?.edits['img-1'].past).toEqual([])
     expect(sanitized?.edits['img-1'].present.label).toBe('Present')
     expect(sanitized?.edits['img-1'].future).toHaveLength(1)
+  })
+
+  it('sanitizePersistedSession normalizes invalid recipe fields to defaults', () => {
+    const session = makeSession({
+      edits: {
+        'img-1': {
+          past: [],
+          present: {
+            recipe: {
+              presetId: 'bogus-preset',
+              backgroundColor: 'not-a-color',
+              imageSizingMode: 'stretch',
+              imageEdgePixels: -5,
+              borderWidthPixels: NaN,
+              minVerticalPaddingPixels: 0,
+              customWidth: 1_000_000,
+              customHeight: -42,
+              filterPresetId: 'vivid',
+              rotationDegrees: '90',
+              flipHorizontal: 'yes',
+              flipVertical: 1,
+            } as never,
+            label: 'Broken',
+            timestamp: 2,
+          },
+          future: [],
+        },
+      },
+    })
+
+    const recipe = sanitizePersistedSession(session)?.edits['img-1'].present.recipe
+    // Strings/booleans fall back to defaults; numbers are clamped per the
+    // useBorderSettings sanitizeSettings convention.
+    expect(recipe).toEqual({
+      ...defaultImageRecipe,
+      imageEdgePixels: 1,
+      minVerticalPaddingPixels: 1,
+      customWidth: 10000,
+      customHeight: 100,
+    })
+  })
+
+  it('sanitizePersistedSession keeps valid recipe overrides', () => {
+    const session = makeSession({
+      edits: {
+        'img-1': {
+          past: [],
+          present: {
+            recipe: {
+              ...defaultImageRecipe,
+              presetId: 'custom',
+              imageSizingMode: 'fill',
+              filterPresetId: 'ember',
+              rotationDegrees: 90,
+              flipHorizontal: true,
+              customWidth: 2000,
+            },
+            label: 'Edited',
+            timestamp: 2,
+          },
+          future: [],
+        },
+      },
+    })
+
+    const recipe = sanitizePersistedSession(session)?.edits['img-1'].present.recipe
+    expect(recipe).toMatchObject({
+      presetId: 'custom',
+      imageSizingMode: 'fill',
+      filterPresetId: 'ember',
+      rotationDegrees: 90,
+      flipHorizontal: true,
+      customWidth: 2000,
+    })
   })
 })

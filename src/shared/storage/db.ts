@@ -17,15 +17,16 @@ export interface PhotoMoatDB extends DBSchema {
   }
 }
 
-let dbPromise: Promise<IDBPDatabase<PhotoMoatDB>> | null = null
+let dbPromise: Promise<IDBPDatabase<PhotoMoatDB> | null> | null = null
 
 /**
  * Open (lazily, once) the PhotoMoat database. Returns `null` when IndexedDB
- * is unavailable (SSR, tests without the polyfill, blocked storage) so
- * callers can degrade to in-memory operation. A failed open clears the cached
+ * is unavailable (SSR, tests without the polyfill, blocked storage) and
+ * resolves to `null` when the open fails (private mode, quota) so callers
+ * can degrade to in-memory operation. A failed open clears the cached
  * promise so a later call can retry.
  */
-export function getDB(): Promise<IDBPDatabase<PhotoMoatDB>> | null {
+export function getDB(): Promise<IDBPDatabase<PhotoMoatDB> | null> | null {
   if (typeof indexedDB === 'undefined') {
     return null
   }
@@ -37,9 +38,9 @@ export function getDB(): Promise<IDBPDatabase<PhotoMoatDB>> | null {
         files.createIndex('by-catalog', 'catalogId')
         db.createObjectStore('kv')
       },
-    }).catch((error: unknown) => {
+    }).catch((_error: unknown) => {
       dbPromise = null
-      throw error
+      return null
     })
   }
 
@@ -53,7 +54,7 @@ export async function resetDB(): Promise<void> {
   }
 
   if (dbPromise) {
-    const db = await dbPromise.catch(() => null)
+    const db = await dbPromise
     db?.close()
     dbPromise = null
   }

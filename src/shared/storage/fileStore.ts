@@ -30,7 +30,11 @@ export async function saveImage(id: string, file: File): Promise<void> {
   if (!db) {
     return
   }
-  await (await db).put('files', await recordFromFile(id, file))
+  const connection = await db
+  if (!connection) {
+    return
+  }
+  await connection.put('files', await recordFromFile(id, file))
 }
 
 export async function getImage(id: string): Promise<PersistedFileRecord | null> {
@@ -38,7 +42,11 @@ export async function getImage(id: string): Promise<PersistedFileRecord | null> 
   if (!db) {
     return null
   }
-  return ((await (await db).get('files', id)) ?? null) as PersistedFileRecord | null
+  const connection = await db
+  if (!connection) {
+    return null
+  }
+  return ((await connection.get('files', id)) ?? null) as PersistedFileRecord | null
 }
 
 export async function deleteImage(id: string): Promise<void> {
@@ -46,7 +54,11 @@ export async function deleteImage(id: string): Promise<void> {
   if (!db) {
     return
   }
-  await (await db).delete('files', id)
+  const connection = await db
+  if (!connection) {
+    return
+  }
+  await connection.delete('files', id)
 }
 
 export async function clearFiles(): Promise<void> {
@@ -54,5 +66,9 @@ export async function clearFiles(): Promise<void> {
   if (!db) {
     return
   }
-  await (await db).clear('files')
+  const connection = await db
+  if (!connection) {
+    return
+  }
+  await connection.clear('files')
 }

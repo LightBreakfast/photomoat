@@ -1,11 +1,18 @@
 import {
   inspectZoomPercents,
   type EditHistoryEntry,
+  type ImageEditRecipe,
+  type ImageSizingMode,
   type InspectZoom,
 } from '@/features/borders/types'
+import { customSizeMax, customSizeMin } from '@/features/borders/constants'
+import { defaultImageRecipe } from '@/features/borders/defaultImageRecipe'
+import { isFilterPresetId } from '@/features/borders/filterPresets'
+import { instagramPresets } from '@/features/borders/presets'
 import { getDB } from '@/shared/storage/db'
 import {
   SESSION_SCHEMA_VERSION,
+  WORKING_CATALOG_ID,
   type PersistedImageHistory,
   type PersistedQueueItem,
   type PersistedSession,
@@ -13,6 +20,18 @@ import {
 } from '@/shared/storage/types'
 
 const SESSION_KEY = 'session'
+
+const presetIds = new Set<string>(['custom', ...instagramPresets.map((preset) => preset.id)])
+const imageSizingModes = new Set<ImageSizingMode>([
+  'contain',
+  'long-edge',
+  'short-edge',
+  'border-width',
+  'fixed-sides',
+  'fill',
+])
+
+const HEX_COLOR = /^#[0-9a-f]{6}$/i
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
@@ -60,16 +79,85 @@ function sanitizeQueueItem(value: unknown): PersistedQueueItem | null {
   return item
 }
 
-function isEditHistoryEntry(value: unknown): value is EditHistoryEntry {
+/**
+ * Validate + normalize one recipe field against the current shape. Mirrors
+ * the sanitizeSettings pattern in useBorderSettings: valid values win,
+ * anything else falls back to the default recipe.
+ */
+function sanitizeRecipe(value: unknown): ImageEditRecipe | null {
   if (!isRecord(value)) {
-    return false
+    return null
   }
-  return (
-    isRecord(value.recipe) &&
-    typeof value.label === 'string' &&
-    typeof value.timestamp === 'number' &&
-    Number.isFinite(value.timestamp)
+
+  const recipe: ImageEditRecipe = { ...defaultImageRecipe }
+
+  if (typeof value.presetId === 'string' && presetIds.has(value.presetId)) {
+    recipe.presetId = value.presetId as ImageEditRecipe['presetId']
+  }
+  if (typeof value.backgroundColor === 'string' && HEX_COLOR.test(value.backgroundColor)) {
+    recipe.backgroundColor = value.backgroundColor
+  }
+  if (typeof value.imageSizingMode === 'string' && imageSizingModes.has(value.imageSizingMode as ImageSizingMode)) {
+    recipe.imageSizingMode = value.imageSizingMode as ImageSizingMode
+  }
+
+  const sanitizePositiveInteger = (raw: unknown, fallback: number) =>
+    typeof raw === 'number' && Number.isFinite(raw) ? Math.max(1, Math.round(raw)) : fallback
+  const sanitizePositiveIntegerInRange = (raw: unknown, fallback: number, min: number, max: number) =>
+    typeof raw === 'number' && Number.isFinite(raw)
+      ? Math.min(max, Math.max(min, Math.round(raw)))
+      : fallback
+
+  recipe.imageEdgePixels = sanitizePositiveInteger(value.imageEdgePixels, recipe.imageEdgePixels)
+  recipe.borderWidthPixels = sanitizePositiveInteger(value.borderWidthPixels, recipe.borderWidthPixels)
+  recipe.minVerticalPaddingPixels = sanitizePositiveInteger(
+    value.minVerticalPaddingPixels,
+    recipe.minVerticalPaddingPixels,
   )
+  recipe.customWidth = sanitizePositiveIntegerInRange(
+    value.customWidth,
+    recipe.customWidth,
+    customSizeMin,
+    customSizeMax,
+  )
+  recipe.customHeight = sanitizePositiveIntegerInRange(
+    value.customHeight,
+    recipe.customHeight,
+    customSizeMin,
+    customSizeMax,
+  )
+
+  if (isFilterPresetId(value.filterPresetId)) {
+    recipe.filterPresetId = value.filterPresetId
+  }
+  if (typeof value.rotationDegrees === 'number' && Number.isFinite(value.rotationDegrees)) {
+    recipe.rotationDegrees = value.rotationDegrees
+  }
+  if (typeof value.flipHorizontal === 'boolean') {
+    recipe.flipHorizontal = value.flipHorizontal
+  }
+  if (typeof value.flipVertical === 'boolean') {
+    recipe.flipVertical = value.flipVertical
+  }
+
+  return recipe
+}
+
+function sanitizeEditHistoryEntry(value: unknown): EditHistoryEntry | null {
+  if (!isRecord(value)) {
+    return null
+  }
+  if (typeof value.label !== 'string') {
+    return null
+  }
+  if (typeof value.timestamp !== 'number' || !Number.isFinite(value.timestamp)) {
+    return null
+  }
+  const recipe = sanitizeRecipe(value.recipe)
+  if (!recipe) {
+    return null
+  }
+  return { recipe, label: value.label, timestamp: value.timestamp }
 }
 
 function sanitizeEditHistory(value: unknown): PersistedImageHistory | null {
@@ -77,15 +165,19 @@ function sanitizeEditHistory(value: unknown): PersistedImageHistory | null {
     return null
   }
 
-  const present = value.present
-  if (!isEditHistoryEntry(present)) {
+  const present = sanitizeEditHistoryEntry(value.present)
+  if (!present) {
     return null
   }
 
   return {
-    past: value.past.filter(isEditHistoryEntry),
+    past: value.past
+      .map(sanitizeEditHistoryEntry)
+      .filter((entry): entry is EditHistoryEntry => entry !== null),
     present,
-    future: value.future.filter(isEditHistoryEntry),
+    future: value.future
+      .map(sanitizeEditHistoryEntry)
+      .filter((entry): entry is EditHistoryEntry => entry !== null),
   }
 }
 
@@ -186,15 +278,28 @@ export async function loadSession(): Promise<PersistedSession | null> {
   if (!db) {
     return null
   }
+  const connection = await db
+  if (!connection) {
+    return null
+  }
 
-  const raw = await (await db).get('kv', SESSION_KEY)
+  // Read + (on invalid) clear in one transaction so the session doc and its
+  // image bytes are discarded together (v1 policy: no migration).
+  const tx = connection.transaction(['kv', 'files'], 'readwrite')
+  const raw = await tx.objectStore('kv').get(SESSION_KEY)
   const session = sanitizePersistedSession(raw)
 
   if (!session) {
-    // Invalid/unknown shape — discard rather than fail (v1 policy).
-    await clearSession()
+    await tx.objectStore('kv').delete(SESSION_KEY)
+    const byCatalog = tx.objectStore('files').index('by-catalog')
+    let cursor = await byCatalog.openCursor(WORKING_CATALOG_ID)
+    while (cursor) {
+      await cursor.delete()
+      cursor = await cursor.continue()
+    }
   }
 
+  await tx.done
   return session
 }
 
@@ -203,7 +308,11 @@ export async function saveSession(session: PersistedSession): Promise<void> {
   if (!db) {
     return
   }
-  await (await db).put('kv', session, SESSION_KEY)
+  const connection = await db
+  if (!connection) {
+    return
+  }
+  await connection.put('kv', session, SESSION_KEY)
 }
 
 export async function clearSession(): Promise<void> {
@@ -211,5 +320,9 @@ export async function clearSession(): Promise<void> {
   if (!db) {
     return
   }
-  await (await db).delete('kv', SESSION_KEY)
+  const connection = await db
+  if (!connection) {
+    return
+  }
+  await connection.delete('kv', SESSION_KEY)
 }

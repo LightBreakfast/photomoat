@@ -262,6 +262,45 @@ describe('useImageQueue', () => {
     })
   })
 
+  it('restores error items with intact source data as ready', async () => {
+    const { result } = renderHook(() =>
+      useImageQueue({
+        loadDimensions: vi.fn(),
+        createObjectUrl: (file) => `blob:${file.name}`,
+        revokeObjectUrl: vi.fn(),
+      }),
+    )
+
+    const file = new File(['jpg'], 'portrait.jpg', { type: 'image/jpeg' })
+    await act(async () => {
+      await result.current.restoreItems(
+        [
+          {
+            id: 'img-5',
+            filename: 'portrait.jpg',
+            mimeType: 'image/jpeg',
+            originalWidth: 1200,
+            originalHeight: 800,
+            status: 'error',
+            error: 'Export failed.',
+          },
+        ],
+        () => Promise.resolve(file),
+      )
+    })
+
+    // A failed export is transient — the source is intact, so after a refresh
+    // the image is usable again instead of being stuck in an error state.
+    expect(result.current.items[0]).toMatchObject({
+      id: 'img-5',
+      status: 'ready',
+      error: undefined,
+      originalWidth: 1200,
+      originalHeight: 800,
+    })
+    expect(result.current.items[0].objectUrl).toBe('blob:portrait.jpg')
+  })
+
   it('revokes replaced object URLs on idempotent restore', async () => {
     const revokeObjectUrl = vi.fn()
     let urlCounter = 0

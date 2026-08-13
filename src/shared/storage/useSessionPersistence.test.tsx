@@ -5,7 +5,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ImageHistory, ImageEditRecipe } from '@/features/borders/types'
 import { resetDB } from '@/shared/storage/db'
 import { saveImage } from '@/shared/storage/fileStore'
-import { loadSession, saveSession } from '@/shared/storage/sessionStore'
+import {
+  loadSession,
+  saveSession,
+} from '@/shared/storage/sessionStore'
 import {
   SESSION_SCHEMA_VERSION,
   type PersistedSession,
@@ -16,6 +19,16 @@ import {
   type PersistenceStatus,
 } from '@/shared/storage/useSessionPersistence'
 import type { ImageQueueItem } from '@/shared/types'
+
+// loadSession is wrapped in a mock so the initial-lookup race test can defer
+// its resolution; by default it delegates to the real implementation.
+vi.mock('@/shared/storage/sessionStore', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/shared/storage/sessionStore')>()
+  return {
+    ...actual,
+    loadSession: vi.fn(actual.loadSession),
+  }
+})
 
 const defaultRecipe: ImageEditRecipe = {
   presetId: 'instagram-square',
@@ -73,30 +86,32 @@ function makeSession(overrides: Partial<PersistedSession> = {}): PersistedSessio
 }
 
 function setupHook(items: ImageQueueItem[] = [], onRestore = vi.fn().mockResolvedValue(undefined)) {
-  const uiStateRef = { current: { ...defaultUi } }
+  let uiState: PersistedUiState = { ...defaultUi }
   const recipesById: Record<string, ImageHistory> = {}
   for (const item of items) {
     recipesById[item.id] = makeHistory()
   }
 
   const utils = renderHook(
-    ({ queueItems }) =>
+    ({ queueItems, ui }) =>
       useSessionPersistence({
         items: queueItems,
         recipesById,
-        uiStateRef,
+        uiState: ui,
         onRestore,
       }),
-    { initialProps: { queueItems: items } },
+    { initialProps: { queueItems: items, ui: uiState } },
   )
 
   return {
     ...utils,
     onRestore,
-    uiStateRef,
+    uiState,
     recipesById,
     getStatus: () => utils.result.current.status as PersistenceStatus,
-    rerenderWith: (queueItems: ImageQueueItem[]) => utils.rerender({ queueItems }),
+    /** Re-render with new queue items and (optionally) a fresh UI state object. */
+    rerenderWith: (queueItems: ImageQueueItem[], nextUi: PersistedUiState = uiState) =>
+      utils.rerender({ queueItems, ui: nextUi }),
   }
 }
 
@@ -187,6 +202,7 @@ describe('useSessionPersistence', () => {
     // Adding images abandons the old session (decision: adding without
     // restoring starts fresh) — the kept data is replaced by the new work.
     rerenderWith([makeItem('img-1')])
+    await flush() // let the deferred auto-start activate saving
     await flush(400)
 
     expect(getStatus().status).toBe('active')
@@ -217,6 +233,7 @@ describe('useSessionPersistence', () => {
     expect(getStatus().status).toBe('offer-restore')
 
     rerenderWith([makeItem('img-1')])
+    await flush() // let the deferred auto-start activate saving
     await flush(400)
 
     expect(getStatus().status).toBe('active')
@@ -229,10 +246,12 @@ describe('useSessionPersistence', () => {
     await flush()
 
     rerenderWith([makeItem('img-1')])
+    await flush() // let the deferred auto-start activate saving
     await flush(400)
     expect(await loadSession()).not.toBeNull()
 
     rerenderWith([])
+    await flush()
     await flush(400)
     expect(await loadSession()).toBeNull()
   })
@@ -303,9 +322,98 @@ describe('useSessionPersistence', () => {
     rerenderWith([])
     await flush()
     rerenderWith([makeItem('img-3')])
+    await flush() // let the deferred auto-start activate saving
     await flush(400)
     expect(getStatus().status).toBe('active')
     const saved = await loadSession()
     expect(saved?.items.map((item) => item.id)).toEqual(['img-3'])
+  })
+
+  it('persists UI-only changes after the debounce', async () => {
+    const { rerenderWith } = setupHook()
+    await flush()
+
+    rerenderWith([makeItem('img-1')])
+    await flush() // let the deferred auto-start activate saving
+    await flush(400)
+    expect(await loadSession()).not.toBeNull()
+
+    // Same queue, but a fresh UI state (inspect mode, zoom, columns). The
+    // debounced save must pick it up without any queue/edit change.
+    rerenderWith([makeItem('img-1')], {
+      workspaceMode: 'inspect',
+      activeItemId: 'img-1',
+      selectedIds: [],
+      inspectZoom: { mode: 'percent', percent: 100 },
+      columns: 2,
+    })
+    await flush(400)
+
+    const saved = await loadSession()
+    expect(saved?.ui.workspaceMode).toBe('inspect')
+    expect(saved?.ui.activeItemId).toBe('img-1')
+    expect(saved?.ui.inspectZoom).toEqual({ mode: 'percent', percent: 100 })
+    expect(saved?.ui.columns).toBe(2)
+  })
+
+  it('a user add before the initial lookup settles wins over a stored session', async () => {
+    const session = makeSession()
+    let resolveLoad!: (value: PersistedSession | null) => void
+    const loadPromise = new Promise<PersistedSession | null>((resolve) => {
+      resolveLoad = resolve
+    })
+    vi.mocked(loadSession).mockImplementationOnce(() => loadPromise)
+
+    const { getStatus, rerenderWith } = setupHook()
+    await flush()
+    expect(getStatus().status).toBe('idle') // lookup still pending
+
+    // The user starts fresh work before the old session finishes loading.
+    rerenderWith([makeItem('img-1')])
+    await flush()
+    // No restore offer is shown; the auto-start is deferred until the
+    // pending lookup settles.
+    expect(getStatus().status).not.toBe('offer-restore')
+
+    // The late lookup result must not resurrect a restore offer.
+    await act(async () => {
+      resolveLoad(session)
+    })
+    await flush(0)
+    expect(getStatus().status).toBe('active')
+
+    // The stale stored session is discarded, not kept for later.
+    await flush()
+    await flush(400)
+    expect((await loadSession())?.items.map((item) => item.id)).toEqual(['img-1'])
+  })
+
+  it('ignores a second restore while one is already in flight', async () => {
+    const session = makeSession()
+    await saveSession(session)
+
+    let resolveRestore!: () => void
+    const onRestore = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          resolveRestore = resolve
+        }),
+    )
+    const { getStatus, result } = setupHook([], onRestore)
+    await flush()
+    expect(getStatus().status).toBe('offer-restore')
+
+    let first: Promise<void>
+    await act(async () => {
+      first = result.current.acceptRestore()
+      await result.current.acceptRestore() // second trigger while in flight
+    })
+    expect(onRestore).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      resolveRestore()
+      await first
+    })
+    expect(getStatus().status).toBe('active')
   })
 })

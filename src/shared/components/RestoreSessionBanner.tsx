@@ -7,6 +7,8 @@ type RestoreSessionBannerProps = {
   savedAt: number
   /** e.g. "2.1 MB of 1.2 GB" from navigator.storage.estimate(). */
   storageLabel?: string
+  /** Disables the actions while a restore is in flight. */
+  isRestoring?: boolean
   onRestore: () => void
   /** Wipes the stored session + image files. */
   onClear: () => void
@@ -26,6 +28,7 @@ export function RestoreSessionBanner({
   imageCount,
   savedAt,
   storageLabel,
+  isRestoring = false,
   onRestore,
   onClear,
   onDismiss,
@@ -39,17 +42,18 @@ export function RestoreSessionBanner({
         {storageLabel ? ` · ${storageLabel}` : null}
       </p>
       <div className="flex shrink-0 items-center gap-2">
-        <Button size="sm" onClick={onRestore}>
+        <Button size="sm" onClick={onRestore} disabled={isRestoring}>
           Restore
         </Button>
-        <Button size="sm" variant="outline" onClick={onClear}>
+        <Button size="sm" variant="outline" onClick={onClear} disabled={isRestoring}>
           Clear saved
         </Button>
         <button
           type="button"
           onClick={onDismiss}
+          disabled={isRestoring}
           aria-label="Dismiss — keep saved session for next time"
-          className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="flex h-6 w-6 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
         >
           <X size={14} />
         </button>

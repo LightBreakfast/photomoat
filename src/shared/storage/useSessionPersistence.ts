@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type MutableRefObject } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 import type { ImageHistory } from '@/features/borders/types'
 import { clearFiles } from '@/shared/storage/fileStore'
@@ -23,8 +23,13 @@ export type PersistenceStatus =
 type UseSessionPersistenceOptions = {
   items: ImageQueueItem[]
   recipesById: Record<string, ImageHistory>
-  /** Latest UI session state (BorderToolPage keeps this fresh each render). */
-  uiStateRef: MutableRefObject<PersistedUiState>
+  /**
+   * Latest UI session state. Passed by value so a UI-only change (workspace
+   * mode, active image, selection, zoom, columns) re-schedules the debounced
+   * save even when the queue and recipes are unchanged. Callers should memoize
+   * this so unrelated re-renders don't reset the debounce.
+   */
+  uiState: PersistedUiState
   /** Hydrate queue + edit state + UI from a stored session. Called once. */
   onRestore: (session: PersistedSession) => Promise<void>
 }
@@ -88,18 +93,29 @@ function buildSession(
  * - `active`          session restored or a fresh one started; debounced saving
  *
  * Saving only ever happens in `active`. The first image added outside
- * `active` starts a fresh session, clearing any stale stored data first.
+ * `active` starts a fresh session, clearing any stale stored data first. The
+ * initial session lookup and the first add are coordinated so a slow lookup
+ * can never resurrect a restore offer over work the user already started.
  */
 export function useSessionPersistence({
   items,
   recipesById,
-  uiStateRef,
+  uiState,
   onRestore,
 }: UseSessionPersistenceOptions) {
   const [status, setStatus] = useState<PersistenceStatus>({ status: 'idle' })
   const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null)
+  const [isRestoring, setIsRestoring] = useState(false)
 
   const storedSessionExistsRef = useRef(false)
+  // Synchronous guard so a second Restore trigger while one is in flight
+  // (e.g. a double-click) is rejected before any async work starts.
+  const restoringRef = useRef(false)
+  // Set synchronously when the user's first add happens, before the initial
+  // lookup settles — the lookup must not override work the user started.
+  const userStartedRef = useRef(false)
+  // Resolves when the mount-time lookup has settled (success or failure).
+  const initialLoadRef = useRef<Promise<void> | null>(null)
   // Track the empty→non-empty transition: only the first add (from an empty
   // queue) outside `active` starts a fresh session. After the queue empties
   // again, the next add re-triggers.
@@ -108,15 +124,25 @@ export function useSessionPersistence({
   // Look for a stored session once on mount.
   useEffect(() => {
     let cancelled = false
-    void loadSession().then((session) => {
-      if (cancelled) {
-        return
-      }
-      if (session) {
+    initialLoadRef.current = loadSession()
+      .then((session) => {
+        if (cancelled) {
+          return
+        }
+        if (!session) {
+          return
+        }
         storedSessionExistsRef.current = true
+        if (userStartedRef.current) {
+          // The user already started fresh work before the lookup settled;
+          // the auto-start effect clears this stale data. Don't offer it.
+          return
+        }
         setStatus({ status: 'offer-restore', session })
-      }
-    })
+      })
+      .catch(() => {
+        // Storage unavailable — continue in-memory; no restore offer.
+      })
     return () => {
       cancelled = true
     }
@@ -127,18 +153,22 @@ export function useSessionPersistence({
   }, [])
 
   const acceptRestore = useCallback(async () => {
-    if (status.status !== 'offer-restore') {
+    if (status.status !== 'offer-restore' || restoringRef.current) {
       return
     }
+    restoringRef.current = true
+    setIsRestoring(true)
     try {
       await onRestore(status.session)
+      storedSessionExistsRef.current = false
+      setStatus({ status: 'active' })
+      void requestPersistence()
     } catch {
       // Stay on the offer so the user can retry or dismiss.
-      return
+    } finally {
+      restoringRef.current = false
+      setIsRestoring(false)
     }
-    storedSessionExistsRef.current = false
-    setStatus({ status: 'active' })
-    void requestPersistence()
   }, [status, onRestore])
 
   const dismiss = useCallback(() => {
@@ -150,35 +180,48 @@ export function useSessionPersistence({
   }, [status])
 
   const startFresh = useCallback(async () => {
-    await clearSession()
-    await clearFiles()
+    try {
+      await clearSession()
+      await clearFiles()
+    } catch {
+      // Storage unavailable — continue in-memory; never block the add.
+    }
     storedSessionExistsRef.current = false
     setStatus({ status: 'active' })
     void requestPersistence()
   }, [])
 
   const clearLibrary = useCallback(async () => {
-    await clearSession()
-    await clearFiles()
+    try {
+      await clearSession()
+      await clearFiles()
+    } catch {
+      // Storage unavailable — the in-memory session remains usable.
+    }
     storedSessionExistsRef.current = false
     setStatus({ status: 'idle' })
   }, [])
 
   // Adding the first image outside `active` starts a fresh session. If a
   // stored session was declined (dismiss) or never answered, it is stale by
-  // definition now — clear it before saving the new work.
+  // definition now — clear it before saving the new work. The clear waits for
+  // the initial lookup so a race can't leave stale data behind.
   useEffect(() => {
     if (status.status === 'active') {
       return
     }
     if (items.length > 0 && wasEmptyRef.current) {
       wasEmptyRef.current = false
-      if (storedSessionExistsRef.current) {
-        void clearSession()
-        void clearFiles()
-      }
-      setStatus({ status: 'active' })
-      void requestPersistence()
+      userStartedRef.current = true
+      void (initialLoadRef.current ?? Promise.resolve()).then(() => {
+        if (storedSessionExistsRef.current) {
+          storedSessionExistsRef.current = false
+          void clearSession().catch(() => {})
+          void clearFiles().catch(() => {})
+        }
+        setStatus({ status: 'active' })
+        void requestPersistence()
+      })
     } else if (items.length === 0) {
       wasEmptyRef.current = true
     }
@@ -190,10 +233,10 @@ export function useSessionPersistence({
       return
     }
     const timer = window.setTimeout(() => {
-      void writeSession(items, recipesById, uiStateRef.current)
+      void writeSession(items, recipesById, uiState)
     }, SAVE_DEBOUNCE_MS)
     return () => window.clearTimeout(timer)
-  }, [status.status, items, recipesById, uiStateRef])
+  }, [status.status, items, recipesById, uiState])
 
   // Best-effort final flush when the page is hidden or being unloaded.
   useEffect(() => {
@@ -201,7 +244,7 @@ export function useSessionPersistence({
       return
     }
     const flush = () => {
-      void writeSession(items, recipesById, uiStateRef.current)
+      void writeSession(items, recipesById, uiState)
     }
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
@@ -214,11 +257,12 @@ export function useSessionPersistence({
       document.removeEventListener('visibilitychange', onVisibilityChange)
       window.removeEventListener('pagehide', flush)
     }
-  }, [status.status, items, recipesById, uiStateRef])
+  }, [status.status, items, recipesById, uiState])
 
   return {
     status,
     storageUsage,
+    isRestoring,
     acceptRestore,
     dismiss,
     startFresh,
@@ -231,10 +275,14 @@ async function writeSession(
   recipesById: Record<string, ImageHistory>,
   ui: PersistedUiState,
 ): Promise<void> {
-  if (items.length === 0) {
-    // An empty library is "no session" — don't offer a restore of nothing.
-    await clearSession()
-    return
+  try {
+    if (items.length === 0) {
+      // An empty library is "no session" — don't offer a restore of nothing.
+      await clearSession()
+      return
+    }
+    await saveSession(buildSession(items, recipesById, ui))
+  } catch {
+    // Best-effort persistence: the app keeps working in memory.
   }
-  await saveSession(buildSession(items, recipesById, ui))
 }

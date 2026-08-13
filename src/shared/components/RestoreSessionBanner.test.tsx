@@ -46,4 +46,15 @@ describe('RestoreSessionBanner', () => {
     await userEvent.click(screen.getByRole('button', { name: /Dismiss/ }))
     expect(props.onDismiss).toHaveBeenCalledTimes(1)
   })
+
+  it('disables the actions while a restore is in flight', async () => {
+    const props = setup({ isRestoring: true })
+
+    expect(screen.getByRole('button', { name: 'Restore' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Clear saved' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: /Dismiss/ })).toBeDisabled()
+
+    await userEvent.click(screen.getByRole('button', { name: 'Restore' }))
+    expect(props.onRestore).not.toHaveBeenCalled()
+  })
 })
