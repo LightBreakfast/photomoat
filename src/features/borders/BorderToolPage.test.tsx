@@ -808,8 +808,6 @@ describe('BorderToolPage workspace', () => {
     expect(renderProcessedCanvasMock.mock.calls[0][0].rotationDegrees).toBe(0)
   })
 
-  // --- Session persistence ---
-
   it('offers to restore a stored session and dismiss keeps the data', async () => {
     const session = makeSession()
     await saveSession(session)
@@ -840,7 +838,6 @@ describe('BorderToolPage workspace', () => {
     await saveSession(session)
     await saveImage('1', createItem('1', 'one.jpg').file)
 
-    // Stateful fake that mirrors the real useImageQueue.restoreItems.
     useImageQueueMock.mockImplementation(() => {
       const [items, setItems] = useState<ImageQueueItem[]>([])
       return {
@@ -864,8 +861,6 @@ describe('BorderToolPage workspace', () => {
 
     expect(screen.queryByText(/Pick up where you left off\?/)).not.toBeInTheDocument()
 
-    // UI state restored: inspect mode with the single restored image, and the
-    // hydrated per-image recipe (ember filter) drives the inspect preview.
     await waitFor(() => {
       expect(screen.getByTestId('inspect-filter')).toHaveTextContent('ember')
     })
@@ -889,11 +884,9 @@ describe('BorderToolPage workspace', () => {
 
     render(<BorderToolPage />)
 
-    // Wait for the initial save (queue present → persistence auto-starts).
     await new Promise((resolve) => setTimeout(resolve, 600))
     await userEvent.click(screen.getByRole('button', { name: 'Inspect image' }))
 
-    // A UI-only change must re-schedule the debounced save on its own.
     await new Promise((resolve) => setTimeout(resolve, 600))
 
     const saved = await loadSession()

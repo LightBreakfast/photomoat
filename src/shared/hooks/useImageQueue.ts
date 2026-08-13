@@ -9,11 +9,6 @@ type UseImageQueueOptions = {
   loadDimensions?: (file: File, objectUrl: string) => Promise<ImageDimensions>
   createObjectUrl?: (file: File) => string
   revokeObjectUrl?: (objectUrl: string) => void
-  /**
-   * Write-through hook: called once per added file so the caller can persist
-   * the bytes (e.g. to IndexedDB). Failures are reported but never block the
-   * add — the app keeps working in memory.
-   */
   persistImage?: (record: { id: string; file: File }) => Promise<boolean | void>
 }
 
@@ -182,11 +177,6 @@ export function useImageQueue({
     [updateItem],
   )
 
-  /**
-   * Rebuild the queue from a persisted session. Object URLs are recreated
-   * (they are invalid across sessions), missing file data becomes an error
-   * item, and missing dimensions are recomputed.
-   */
   const restoreItems = useCallback(
     async (
       records: PersistedQueueItem[],
@@ -196,7 +186,6 @@ export function useImageQueue({
       const restored: ImageQueueItem[] = []
 
       for (const record of records) {
-        // Idempotent restore: revoke any object URL we are about to replace.
         const existingUrl = currentUrls.get(record.id)
         if (existingUrl) {
           revokeObjectUrl(existingUrl)
@@ -219,10 +208,6 @@ export function useImageQueue({
         }
 
         const objectUrl = createObjectUrl(file)
-        // A stored `error` is only trustworthy when the source can't be
-        // verified. Once the file is back and its dimensions are known the
-        // source is usable, so transient failures (a failed export, a one-off
-        // decode hiccup) must not stick to a good image after a refresh.
         const item: ImageQueueItem = {
           id: record.id,
           file,

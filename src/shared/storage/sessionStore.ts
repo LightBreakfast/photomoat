@@ -79,11 +79,6 @@ function sanitizeQueueItem(value: unknown): PersistedQueueItem | null {
   return item
 }
 
-/**
- * Validate + normalize one recipe field against the current shape. Mirrors
- * the sanitizeSettings pattern in useBorderSettings: valid values win,
- * anything else falls back to the default recipe.
- */
 function sanitizeRecipe(value: unknown): ImageEditRecipe | null {
   if (!isRecord(value)) {
     return null
@@ -229,10 +224,6 @@ function sanitizeUi(value: unknown, itemIds: string[]): PersistedUiState | null 
   }
 }
 
-/**
- * Validate + normalize an unknown stored value into a usable session.
- * Returns `null` for anything that isn't a session for this schema version.
- */
 export function sanitizePersistedSession(value: unknown): PersistedSession | null {
   if (!isRecord(value) || value.schemaVersion !== SESSION_SCHEMA_VERSION) {
     return null
@@ -272,7 +263,6 @@ export function sanitizePersistedSession(value: unknown): PersistedSession | nul
   return { schemaVersion: SESSION_SCHEMA_VERSION, savedAt, items, edits, ui }
 }
 
-/** Load the stored working session, or `null` when absent/invalid. */
 export async function loadSession(): Promise<PersistedSession | null> {
   const db = getDB()
   if (!db) {
@@ -283,13 +273,8 @@ export async function loadSession(): Promise<PersistedSession | null> {
     return null
   }
 
-  // Read + (on invalid) clear in one transaction so the session doc and its
-  // image bytes are discarded together (v1 policy: no migration).
   const tx = connection.transaction(['kv', 'files'], 'readwrite')
   const raw = await tx.objectStore('kv').get(SESSION_KEY)
-  // No session is a normal first-run state. Do not clear working files here:
-  // another tab may have written the file bytes before its debounced session
-  // document write lands.
   if (raw === undefined) {
     await tx.done
     return null

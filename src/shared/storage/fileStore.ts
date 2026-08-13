@@ -1,11 +1,6 @@
 import { getDB } from '@/shared/storage/db'
 import { WORKING_CATALOG_ID, type PersistedFileRecord } from '@/shared/storage/types'
 
-/**
- * Build a `PersistedFileRecord` from a dropped-in `File`. The bytes are read
- * into an `ArrayBuffer` and name/type/lastModified are kept as separate
- * fields, so `fileFromRecord` can rebuild an identical `File` on restore.
- */
 export async function recordFromFile(id: string, file: File): Promise<PersistedFileRecord> {
   return {
     id,
@@ -17,7 +12,6 @@ export async function recordFromFile(id: string, file: File): Promise<PersistedF
   }
 }
 
-/** Rebuild a `File` from a stored record (object URLs are created by the caller). */
 export function fileFromRecord(record: PersistedFileRecord): File {
   return new File([record.bytes], record.name, {
     type: record.type,

@@ -395,7 +395,6 @@ describe('useImageEdits batch patches', () => {
       })
     })
 
-    // 'a' is gone (hydrate replaces wholesale)
     expect(result.current.getRecipe('a')).toEqual(defaultRecipe)
     expect(result.current.getRecipe('b')).toMatchObject({ filterPresetId: 'ember', rotationDegrees: 90 })
     expect(result.current.getTimeline('b')?.entries[0].label).toBe('Rotate 90° CW')

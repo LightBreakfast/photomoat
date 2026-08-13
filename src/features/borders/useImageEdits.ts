@@ -308,11 +308,6 @@ export function useImageEdits(initialRecipe: ImageEditRecipe) {
     [initialRecipe],
   )
 
-  /**
-   * Replace all edit state with a persisted session's histories. Recipes are
-   * merged over the current defaults so future recipe fields fall back safely;
-   * the transient `working` overlay is never restored.
-   */
   const hydrate = useCallback(
     (byId: Record<string, ImageHistory>) => {
       const sanitized: Record<string, ImageHistory> = {}

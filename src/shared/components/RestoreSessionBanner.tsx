@@ -5,14 +5,10 @@ import { Button } from '@/components/ui/button'
 type RestoreSessionBannerProps = {
   imageCount: number
   savedAt: number
-  /** e.g. "2.1 MB of 1.2 GB" from navigator.storage.estimate(). */
   storageLabel?: string
-  /** Disables the actions while a restore is in flight. */
   isRestoring?: boolean
   onRestore: () => void
-  /** Wipes the stored session + image files. */
   onClear: () => void
-  /** Keep the stored data for a future visit; don't restore now. */
   onDismiss: () => void
 }
 
@@ -20,10 +16,6 @@ function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
-/**
- * Offer to restore the previously saved working session. Presentational only —
- * all lifecycle logic lives in useSessionPersistence.
- */
 export function RestoreSessionBanner({
   imageCount,
   savedAt,

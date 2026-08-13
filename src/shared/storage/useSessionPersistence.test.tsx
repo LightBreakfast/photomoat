@@ -20,8 +20,6 @@ import {
 } from '@/shared/storage/useSessionPersistence'
 import type { ImageQueueItem } from '@/shared/types'
 
-// loadSession is wrapped in a mock so the initial-lookup race test can defer
-// its resolution; by default it delegates to the real implementation.
 vi.mock('@/shared/storage/sessionStore', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/shared/storage/sessionStore')>()
   return {
@@ -109,17 +107,11 @@ function setupHook(items: ImageQueueItem[] = [], onRestore = vi.fn().mockResolve
     uiState,
     recipesById,
     getStatus: () => utils.result.current.status as PersistenceStatus,
-    /** Re-render with new queue items and (optionally) a fresh UI state object. */
     rerenderWith: (queueItems: ImageQueueItem[], nextUi: PersistedUiState = uiState) =>
       utils.rerender({ queueItems, ui: nextUi }),
   }
 }
 
-/**
- * Flush pending microtasks + faked timers, then yield real macrotasks so the
- * fire-and-forget debounced write (committed by fake-indexeddb via setImmediate)
- * lands before read-backs.
- */
 async function flush(ms = 0) {
   await act(async () => {
     await vi.advanceTimersByTimeAsync(ms)
@@ -131,8 +123,6 @@ async function flush(ms = 0) {
 
 beforeEach(async () => {
   await resetDB()
-  // Only fake the debounce timers — fake-indexeddb schedules via setImmediate,
-  // which the default fake-timer set would also stall.
   vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
 })
 
@@ -177,7 +167,6 @@ describe('useSessionPersistence', () => {
     expect(onRestore).toHaveBeenCalledWith(session)
     expect(getStatus().status).toBe('active')
 
-    // Now that a session is active, queue changes get persisted (debounced).
     rerenderWith([makeItem('img-1')])
     await flush(400)
 
@@ -199,8 +188,6 @@ describe('useSessionPersistence', () => {
     expect(getStatus().status).toBe('idle')
     expect(await loadSession()).toEqual(session) // data kept on disk
 
-    // Adding images abandons the old session (decision: adding without
-    // restoring starts fresh) — the kept data is replaced by the new work.
     rerenderWith([makeItem('img-1')])
     await flush() // let the deferred auto-start activate saving
     await flush(400)
@@ -345,8 +332,6 @@ describe('useSessionPersistence', () => {
     expect(getStatus().status).toBe('idle')
     expect(await loadSession()).toBeNull()
 
-    // clearLibrary doesn't touch the queue; saving stays off until it empties
-    // and refills.
     rerenderWith([makeItem('img-2')])
     await flush(400)
     expect(getStatus().status).toBe('idle')
@@ -385,8 +370,6 @@ describe('useSessionPersistence', () => {
     await flush(400)
     expect(await loadSession()).not.toBeNull()
 
-    // Same queue, but a fresh UI state (inspect mode, zoom, columns). The
-    // debounced save must pick it up without any queue/edit change.
     rerenderWith([makeItem('img-1')], {
       workspaceMode: 'inspect',
       activeItemId: 'img-1',
@@ -415,21 +398,16 @@ describe('useSessionPersistence', () => {
     await flush()
     expect(getStatus().status).toBe('idle') // lookup still pending
 
-    // The user starts fresh work before the old session finishes loading.
     rerenderWith([makeItem('img-1')])
     await flush()
-    // No restore offer is shown; the auto-start is deferred until the
-    // pending lookup settles.
     expect(getStatus().status).not.toBe('offer-restore')
 
-    // The late lookup result must not resurrect a restore offer.
     await act(async () => {
       resolveLoad(session)
     })
     await flush(0)
     expect(getStatus().status).toBe('active')
 
-    // The stale stored session is discarded, not kept for later.
     await flush()
     await flush(400)
     expect((await loadSession())?.items.map((item) => item.id)).toEqual(['img-1'])

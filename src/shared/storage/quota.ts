@@ -1,11 +1,8 @@
 export type StorageUsage = {
-  /** Bytes used by this origin's storage buckets. */
   usage: number
-  /** Best-effort quota estimate for this origin. Not a reservation. */
   quota: number
 }
 
-/** Ask the browser to exempt this origin from automatic eviction. */
 export async function requestPersistence(): Promise<boolean> {
   if (typeof navigator === 'undefined' || typeof navigator.storage?.persist !== 'function') {
     return false
@@ -17,7 +14,6 @@ export async function requestPersistence(): Promise<boolean> {
   }
 }
 
-/** Current storage usage vs. quota, or `null` when unavailable. */
 export async function getStorageUsage(): Promise<StorageUsage | null> {
   if (typeof navigator === 'undefined' || typeof navigator.storage?.estimate !== 'function') {
     return null
@@ -33,7 +29,6 @@ export async function getStorageUsage(): Promise<StorageUsage | null> {
   }
 }
 
-/** Human-readable byte size, e.g. "2.1 MB". */
 export function formatBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes <= 0) {
     return '0 B'

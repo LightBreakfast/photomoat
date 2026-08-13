@@ -322,8 +322,6 @@ describe('useImageQueue', () => {
       )
     })
 
-    // A failed export is transient — the source is intact, so after a refresh
-    // the image is usable again instead of being stuck in an error state.
     expect(result.current.items[0]).toMatchObject({
       id: 'img-5',
       status: 'ready',

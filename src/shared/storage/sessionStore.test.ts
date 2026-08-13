@@ -230,8 +230,6 @@ describe('sessionStore', () => {
     })
 
     const recipe = sanitizePersistedSession(session)?.edits['img-1'].present.recipe
-    // Strings/booleans fall back to defaults; numbers are clamped per the
-    // useBorderSettings sanitizeSettings convention.
     expect(recipe).toEqual({
       ...defaultImageRecipe,
       imageEdgePixels: 1,

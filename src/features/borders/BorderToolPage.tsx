@@ -104,8 +104,6 @@ export function BorderToolPage() {
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
   const [isCompareActive, setIsCompareActive] = useState(false)
 
-  // Latest UI session state, memoized so a UI-only change re-schedules the
-  // debounced persistence save even when the queue and recipes are unchanged.
   const uiState = useMemo<PersistedUiState>(
     () => ({
       workspaceMode,
@@ -117,7 +115,6 @@ export function BorderToolPage() {
     [workspaceMode, activeItemId, selectedIds, inspectZoom, columns],
   )
 
-  // --- Session persistence ---
   const handleRestore = useCallback(
     async (session: PersistedSession) => {
       const loadFile = async (id: string) => {
@@ -154,15 +151,12 @@ export function BorderToolPage() {
     onRestore: handleRestore,
   })
 
-  /** Adding files while a restore offer is pending starts a fresh session. */
   const handleAddFiles = useCallback(
     async (files: File[]) => {
       const shouldStartFresh =
         persistenceStatus.status === 'offer-restore' ||
         (persistenceStatus.status === 'idle' && items.length === 0)
       if (shouldStartFresh) {
-        // Complete stale-session cleanup before useImageQueue starts writing
-        // the new file bytes. This prevents clearFiles from deleting them.
         await startFresh()
       }
       await addFiles(files)
