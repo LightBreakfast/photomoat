@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import type { ImageHistory, ImageEditRecipe } from '@/features/borders/types'
 import { resetDB } from '@/shared/storage/db'
-import { saveImage } from '@/shared/storage/fileStore'
+import { getImage, saveImage } from '@/shared/storage/fileStore'
 import {
   loadSession,
   saveSession,
@@ -256,6 +256,38 @@ describe('useSessionPersistence', () => {
     expect(await loadSession()).toBeNull()
   })
 
+  it('exposes a non-blocking warning when storage is unavailable', async () => {
+    vi.stubGlobal('indexedDB', undefined)
+    try {
+      const { result, rerenderWith } = setupHook()
+      await flush()
+      rerenderWith([makeItem('img-1')])
+      await flush()
+
+      expect(result.current.persistenceWarning).toContain('will not survive refresh')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('finishes fresh-session cleanup before new file bytes are written', async () => {
+    await saveSession(makeSession())
+    await saveImage('img-1', makeItem('img-1').file)
+
+    const { result } = setupHook()
+    await flush()
+    expect((result.current.status as PersistenceStatus).status).toBe('offer-restore')
+
+    await act(async () => {
+      result.current.dismiss()
+      await result.current.startFresh()
+    })
+
+    expect(await getImage('img-1')).toBeNull()
+    expect(await saveImage('img-new', makeItem('img-new').file)).toBe(true)
+    expect(await getImage('img-new')).not.toBeNull()
+  })
+
   it('clearLibrary wipes the session and files', async () => {
     await saveSession(makeSession())
     await saveImage('img-1', makeItem('img-1').file)
@@ -327,6 +359,21 @@ describe('useSessionPersistence', () => {
     expect(getStatus().status).toBe('active')
     const saved = await loadSession()
     expect(saved?.items.map((item) => item.id)).toEqual(['img-3'])
+  })
+
+  it('does not save session metadata before image bytes are durable', async () => {
+    const { rerenderWith } = setupHook()
+    await flush()
+
+    const pendingItem = { ...makeItem('img-1'), persisted: false }
+    rerenderWith([pendingItem])
+    await flush()
+    await flush(400)
+    expect(await loadSession()).toBeNull()
+
+    rerenderWith([{ ...pendingItem, persisted: true }])
+    await flush(400)
+    expect((await loadSession())?.items.map((item) => item.id)).toEqual(['img-1'])
   })
 
   it('persists UI-only changes after the debounce', async () => {

@@ -73,6 +73,13 @@ describe('sessionStore', () => {
     expect(await loadSession()).toBeNull()
   })
 
+  it('does not clear files when the session key is absent', async () => {
+    expect(await saveImage('orphan', new File(['x'], 'orphan.jpg', { type: 'image/jpeg' }))).toBe(true)
+
+    expect(await loadSession()).toBeNull()
+    expect(await getImage('orphan')).not.toBeNull()
+  })
+
   it('clears and returns null for a wrong schema version', async () => {
     const db = (await getDB())!
     await db.put('kv', { ...makeSession(), schemaVersion: 999 }, 'session')
@@ -94,11 +101,13 @@ describe('sessionStore', () => {
   it('degrades to in-memory when IndexedDB is unavailable', async () => {
     vi.stubGlobal('indexedDB', undefined)
     try {
-      await saveSession(makeSession())
+      expect(await saveSession(makeSession())).toBe(false)
       expect(await loadSession()).toBeNull()
-      await saveImage('img-1', new File(['x'], 'beach.jpg', { type: 'image/jpeg' }))
+      expect(
+        await saveImage('img-1', new File(['x'], 'beach.jpg', { type: 'image/jpeg' })),
+      ).toBe(false)
       expect(await getImage('img-1')).toBeNull()
-      await clearSession()
+      expect(await clearSession()).toBe(false)
     } finally {
       vi.unstubAllGlobals()
     }

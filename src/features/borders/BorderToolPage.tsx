@@ -141,6 +141,7 @@ export function BorderToolPage() {
   const {
     status: persistenceStatus,
     storageUsage,
+    persistenceWarning,
     isRestoring,
     acceptRestore,
     dismiss,
@@ -156,12 +157,17 @@ export function BorderToolPage() {
   /** Adding files while a restore offer is pending starts a fresh session. */
   const handleAddFiles = useCallback(
     async (files: File[]) => {
-      if (persistenceStatus.status === 'offer-restore') {
+      const shouldStartFresh =
+        persistenceStatus.status === 'offer-restore' ||
+        (persistenceStatus.status === 'idle' && items.length === 0)
+      if (shouldStartFresh) {
+        // Complete stale-session cleanup before useImageQueue starts writing
+        // the new file bytes. This prevents clearFiles from deleting them.
         await startFresh()
       }
       await addFiles(files)
     },
-    [persistenceStatus.status, startFresh, addFiles],
+    [items.length, persistenceStatus.status, startFresh, addFiles],
   )
 
   const readyItems = useMemo(
@@ -866,6 +872,7 @@ export function BorderToolPage() {
   // --- Footer status ---
   const footerStatus =
     message ??
+    persistenceWarning ??
     (workspaceMode === 'inspect' && activeInspectItem
       ? `Editing current image · ${activeInspectItem.filename}`
       : isMultiSelectDisabled

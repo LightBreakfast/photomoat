@@ -35,7 +35,7 @@ type UseSessionPersistenceOptions = {
 }
 
 function serializeItems(items: ImageQueueItem[]): PersistedQueueItem[] {
-  return items.map((item) => {
+  return items.filter((item) => item.persisted !== false).map((item) => {
     const record: PersistedQueueItem = {
       id: item.id,
       filename: item.filename,
@@ -58,9 +58,15 @@ function serializeItems(items: ImageQueueItem[]): PersistedQueueItem[] {
 }
 
 /** Drop the transient `working` overlay — it is never persisted. */
-function serializeEdits(byId: Record<string, ImageHistory>): Record<string, PersistedImageHistory> {
+function serializeEdits(
+  byId: Record<string, ImageHistory>,
+  itemIds: ReadonlySet<string>,
+): Record<string, PersistedImageHistory> {
   const edits: Record<string, PersistedImageHistory> = {}
   for (const [id, history] of Object.entries(byId)) {
+    if (!itemIds.has(id)) {
+      continue
+    }
     edits[id] = {
       past: history.past,
       present: history.present,
@@ -75,11 +81,13 @@ function buildSession(
   recipesById: Record<string, ImageHistory>,
   ui: PersistedUiState,
 ): PersistedSession {
+  const persistedItems = serializeItems(items)
+  const itemIds = new Set(persistedItems.map((item) => item.id))
   return {
     schemaVersion: SESSION_SCHEMA_VERSION,
     savedAt: Date.now(),
-    items: serializeItems(items),
-    edits: serializeEdits(recipesById),
+    items: persistedItems,
+    edits: serializeEdits(recipesById, itemIds),
     ui,
   }
 }
@@ -106,6 +114,7 @@ export function useSessionPersistence({
   const [status, setStatus] = useState<PersistenceStatus>({ status: 'idle' })
   const [storageUsage, setStorageUsage] = useState<StorageUsage | null>(null)
   const [isRestoring, setIsRestoring] = useState(false)
+  const [persistenceWarning, setPersistenceWarning] = useState<string | null>(null)
 
   const storedSessionExistsRef = useRef(false)
   // Synchronous guard so a second Restore trigger while one is in flight
@@ -180,11 +189,14 @@ export function useSessionPersistence({
   }, [status])
 
   const startFresh = useCallback(async () => {
-    try {
-      await clearSession()
-      await clearFiles()
-    } catch {
-      // Storage unavailable — continue in-memory; never block the add.
+    // Mark this before awaiting the lookup so a late old-session result cannot
+    // offer a restore or race the cleanup below.
+    userStartedRef.current = true
+    await (initialLoadRef.current ?? Promise.resolve())
+
+    const [sessionCleared, filesCleared] = await Promise.all([clearSession(), clearFiles()])
+    if (!sessionCleared || !filesCleared) {
+      setPersistenceWarning('Session saving is unavailable; your work will not survive refresh.')
     }
     storedSessionExistsRef.current = false
     setStatus({ status: 'active' })
@@ -192,40 +204,29 @@ export function useSessionPersistence({
   }, [])
 
   const clearLibrary = useCallback(async () => {
-    try {
-      await clearSession()
-      await clearFiles()
-    } catch {
-      // Storage unavailable — the in-memory session remains usable.
+    const [sessionCleared, filesCleared] = await Promise.all([clearSession(), clearFiles()])
+    if (!sessionCleared || !filesCleared) {
+      setPersistenceWarning('Session storage could not be cleared.')
     }
     storedSessionExistsRef.current = false
     setStatus({ status: 'idle' })
   }, [])
 
-  // Adding the first image outside `active` starts a fresh session. If a
-  // stored session was declined (dismiss) or never answered, it is stale by
-  // definition now — clear it before saving the new work. The clear waits for
-  // the initial lookup so a race can't leave stale data behind.
+  // Keep a fallback for callers that add directly to the queue instead of
+  // using BorderToolPage's pre-ingestion startFresh barrier. The page path
+  // awaits startFresh before saveImage begins, so cleanup cannot delete new
+  // file bytes.
   useEffect(() => {
     if (status.status === 'active') {
       return
     }
     if (items.length > 0 && wasEmptyRef.current) {
       wasEmptyRef.current = false
-      userStartedRef.current = true
-      void (initialLoadRef.current ?? Promise.resolve()).then(() => {
-        if (storedSessionExistsRef.current) {
-          storedSessionExistsRef.current = false
-          void clearSession().catch(() => {})
-          void clearFiles().catch(() => {})
-        }
-        setStatus({ status: 'active' })
-        void requestPersistence()
-      })
+      void startFresh()
     } else if (items.length === 0) {
       wasEmptyRef.current = true
     }
-  }, [items.length, status.status])
+  }, [items.length, startFresh, status.status])
 
   // Debounced session-doc write while active.
   useEffect(() => {
@@ -233,7 +234,11 @@ export function useSessionPersistence({
       return
     }
     const timer = window.setTimeout(() => {
-      void writeSession(items, recipesById, uiState)
+      void writeSession(items, recipesById, uiState).then((ok) => {
+        setPersistenceWarning(
+          ok ? null : 'Session saving is unavailable; your work will not survive refresh.',
+        )
+      })
     }, SAVE_DEBOUNCE_MS)
     return () => window.clearTimeout(timer)
   }, [status.status, items, recipesById, uiState])
@@ -244,7 +249,11 @@ export function useSessionPersistence({
       return
     }
     const flush = () => {
-      void writeSession(items, recipesById, uiState)
+      void writeSession(items, recipesById, uiState).then((ok) => {
+        setPersistenceWarning(
+          ok ? null : 'Session saving is unavailable; your work will not survive refresh.',
+        )
+      })
     }
     const onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
@@ -263,6 +272,7 @@ export function useSessionPersistence({
     status,
     storageUsage,
     isRestoring,
+    persistenceWarning,
     acceptRestore,
     dismiss,
     startFresh,
@@ -274,15 +284,11 @@ async function writeSession(
   items: ImageQueueItem[],
   recipesById: Record<string, ImageHistory>,
   ui: PersistedUiState,
-): Promise<void> {
-  try {
-    if (items.length === 0) {
-      // An empty library is "no session" — don't offer a restore of nothing.
-      await clearSession()
-      return
-    }
-    await saveSession(buildSession(items, recipesById, ui))
-  } catch {
-    // Best-effort persistence: the app keeps working in memory.
+): Promise<boolean> {
+  if (items.length === 0 || serializeItems(items).length === 0) {
+    // An empty or not-yet-durable library is "no session" — don't offer a
+    // restore record that cannot be backed by image bytes.
+    return clearSession()
   }
+  return saveSession(buildSession(items, recipesById, ui))
 }

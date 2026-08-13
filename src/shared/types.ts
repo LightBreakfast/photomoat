@@ -28,6 +28,8 @@ export type ImageQueueItem = {
   originalHeight?: number
   status: ImageQueueStatus
   error?: string
+  /** Whether the source bytes are durably stored for session restore. */
+  persisted?: boolean
 }
 
 export type ImageDimensions = {

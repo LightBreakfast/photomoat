@@ -135,10 +135,43 @@ describe('useImageQueue', () => {
     })
   })
 
+  it('does not mark an image durable until its byte write completes', async () => {
+    let resolvePersist!: (value: boolean) => void
+    const persistImage = vi.fn(
+      () =>
+        new Promise<boolean>((resolve) => {
+          resolvePersist = resolve
+        }),
+    )
+    const { result } = renderHook(() =>
+      useImageQueue({
+        loadDimensions: vi.fn().mockResolvedValue({ width: 1000, height: 1000 }),
+        createObjectUrl: (file) => `blob:${file.name}`,
+        revokeObjectUrl: vi.fn(),
+        persistImage,
+      }),
+    )
+
+    let addPromise!: Promise<unknown>
+    await act(async () => {
+      addPromise = result.current.addFiles([jpgFile])
+      await Promise.resolve()
+    })
+
+    expect(result.current.items[0]).toMatchObject({ persisted: false })
+
+    await act(async () => {
+      resolvePersist(true)
+      await addPromise
+    })
+
+    expect(result.current.items[0]).toMatchObject({ persisted: true })
+  })
+
   it('reports persistence failures without failing the add', async () => {
     const persistImage = vi
       .fn()
-      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(true)
       .mockRejectedValueOnce(new Error('quota'))
     const { result } = renderHook(() =>
       useImageQueue({

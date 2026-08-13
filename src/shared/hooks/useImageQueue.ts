@@ -14,7 +14,7 @@ type UseImageQueueOptions = {
    * the bytes (e.g. to IndexedDB). Failures are reported but never block the
    * add — the app keeps working in memory.
    */
-  persistImage?: (record: { id: string; file: File }) => Promise<void>
+  persistImage?: (record: { id: string; file: File }) => Promise<boolean | void>
 }
 
 const defaultCreateObjectUrl = (file: File) => URL.createObjectURL(file)
@@ -87,6 +87,7 @@ export function useImageQueue({
           | 'image/png'
           | 'image/jpeg',
         status: 'pending' as const,
+        persisted: persistImage ? false : true,
       }))
 
       if (queuedItems.length === 0) {
@@ -123,7 +124,18 @@ export function useImageQueue({
 
       if (persistPromise) {
         const results = await persistPromise
-        if (results.some((result) => result.status === 'rejected')) {
+        let persistenceFailed = false
+        results.forEach((result, index) => {
+          const persisted = result.status === 'fulfilled' && result.value !== false
+          if (!persisted) {
+            persistenceFailed = true
+          }
+          const item = queuedItems[index]
+          if (item) {
+            updateItem(item.id, (currentItem) => ({ ...currentItem, persisted }))
+          }
+        })
+        if (persistenceFailed) {
           setMessage('Some images could not be saved for later.')
         }
       }
@@ -201,6 +213,7 @@ export function useImageQueue({
             mimeType: record.mimeType,
             status: 'error',
             error: 'Saved image data is no longer available.',
+            persisted: false,
           })
           continue
         }
@@ -218,6 +231,7 @@ export function useImageQueue({
           mimeType: record.mimeType,
           status: 'ready',
           error: undefined,
+          persisted: true,
         }
 
         if (record.originalWidth !== undefined && record.originalHeight !== undefined) {

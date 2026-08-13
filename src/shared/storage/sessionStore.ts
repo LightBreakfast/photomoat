@@ -287,6 +287,14 @@ export async function loadSession(): Promise<PersistedSession | null> {
   // image bytes are discarded together (v1 policy: no migration).
   const tx = connection.transaction(['kv', 'files'], 'readwrite')
   const raw = await tx.objectStore('kv').get(SESSION_KEY)
+  // No session is a normal first-run state. Do not clear working files here:
+  // another tab may have written the file bytes before its debounced session
+  // document write lands.
+  if (raw === undefined) {
+    await tx.done
+    return null
+  }
+
   const session = sanitizePersistedSession(raw)
 
   if (!session) {
@@ -303,26 +311,36 @@ export async function loadSession(): Promise<PersistedSession | null> {
   return session
 }
 
-export async function saveSession(session: PersistedSession): Promise<void> {
-  const db = getDB()
-  if (!db) {
-    return
+export async function saveSession(session: PersistedSession): Promise<boolean> {
+  try {
+    const db = getDB()
+    if (!db) {
+      return false
+    }
+    const connection = await db
+    if (!connection) {
+      return false
+    }
+    await connection.put('kv', session, SESSION_KEY)
+    return true
+  } catch {
+    return false
   }
-  const connection = await db
-  if (!connection) {
-    return
-  }
-  await connection.put('kv', session, SESSION_KEY)
 }
 
-export async function clearSession(): Promise<void> {
-  const db = getDB()
-  if (!db) {
-    return
+export async function clearSession(): Promise<boolean> {
+  try {
+    const db = getDB()
+    if (!db) {
+      return false
+    }
+    const connection = await db
+    if (!connection) {
+      return false
+    }
+    await connection.delete('kv', SESSION_KEY)
+    return true
+  } catch {
+    return false
   }
-  const connection = await db
-  if (!connection) {
-    return
-  }
-  await connection.delete('kv', SESSION_KEY)
 }

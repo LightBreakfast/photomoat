@@ -25,50 +25,69 @@ export function fileFromRecord(record: PersistedFileRecord): File {
   })
 }
 
-export async function saveImage(id: string, file: File): Promise<void> {
-  const db = getDB()
-  if (!db) {
-    return
+export async function saveImage(id: string, file: File): Promise<boolean> {
+  try {
+    const db = getDB()
+    if (!db) {
+      return false
+    }
+    const connection = await db
+    if (!connection) {
+      return false
+    }
+    await connection.put('files', await recordFromFile(id, file))
+    return true
+  } catch {
+    return false
   }
-  const connection = await db
-  if (!connection) {
-    return
-  }
-  await connection.put('files', await recordFromFile(id, file))
 }
 
 export async function getImage(id: string): Promise<PersistedFileRecord | null> {
-  const db = getDB()
-  if (!db) {
+  try {
+    const db = getDB()
+    if (!db) {
+      return null
+    }
+    const connection = await db
+    if (!connection) {
+      return null
+    }
+    return ((await connection.get('files', id)) ?? null) as PersistedFileRecord | null
+  } catch {
     return null
   }
-  const connection = await db
-  if (!connection) {
-    return null
-  }
-  return ((await connection.get('files', id)) ?? null) as PersistedFileRecord | null
 }
 
-export async function deleteImage(id: string): Promise<void> {
-  const db = getDB()
-  if (!db) {
-    return
+export async function deleteImage(id: string): Promise<boolean> {
+  try {
+    const db = getDB()
+    if (!db) {
+      return false
+    }
+    const connection = await db
+    if (!connection) {
+      return false
+    }
+    await connection.delete('files', id)
+    return true
+  } catch {
+    return false
   }
-  const connection = await db
-  if (!connection) {
-    return
-  }
-  await connection.delete('files', id)
 }
 
-export async function clearFiles(): Promise<void> {
-  const db = getDB()
-  if (!db) {
-    return
+export async function clearFiles(): Promise<boolean> {
+  try {
+    const db = getDB()
+    if (!db) {
+      return false
+    }
+    const connection = await db
+    if (!connection) {
+      return false
+    }
+    await connection.clear('files')
+    return true
+  } catch {
+    return false
   }
-  const connection = await db
-  if (!connection) {
-    return
-  }
-  await connection.clear('files')
 }
