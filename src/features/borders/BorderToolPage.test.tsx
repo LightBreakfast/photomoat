@@ -1,8 +1,18 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+import { defaultImageRecipe } from '@/features/borders/defaultImageRecipe'
 import { BorderToolPage } from '@/features/borders/BorderToolPage'
+import { resetDB } from '@/shared/storage/db'
+import { saveImage } from '@/shared/storage/fileStore'
+import { loadSession, saveSession } from '@/shared/storage/sessionStore'
+import {
+  SESSION_SCHEMA_VERSION,
+  type PersistedQueueItem,
+  type PersistedSession,
+} from '@/shared/storage/types'
 import type { ImageQueueItem } from '@/shared/types'
 
 const {
@@ -113,10 +123,37 @@ function createItem(id: string, filename: string): ImageQueueItem {
   }
 }
 
+function makeSession(): PersistedSession {
+  return {
+    schemaVersion: SESSION_SCHEMA_VERSION,
+    savedAt: 1_700_000_000_000,
+    items: [{ id: '1', filename: 'one.jpg', mimeType: 'image/jpeg', status: 'ready' }],
+    edits: {
+      '1': {
+        past: [],
+        present: {
+          recipe: { ...defaultImageRecipe, filterPresetId: 'ember' },
+          label: 'Filter: Ember',
+          timestamp: 1,
+        },
+        future: [],
+      },
+    },
+    ui: {
+      workspaceMode: 'inspect',
+      activeItemId: '1',
+      selectedIds: [],
+      inspectZoom: { mode: 'fit' },
+      columns: 3,
+    },
+  }
+}
+
 describe('BorderToolPage workspace', () => {
-  beforeEach(() => {
+  beforeEach(async () => {
     vi.clearAllMocks()
     window.localStorage.clear()
+    await resetDB()
 
     renderProcessedCanvasMock.mockResolvedValue(document.createElement('canvas'))
     canvasToBlobMock.mockResolvedValue(new Blob(['ok'], { type: 'image/png' }))
@@ -769,5 +806,96 @@ describe('BorderToolPage workspace', () => {
     })
 
     expect(renderProcessedCanvasMock.mock.calls[0][0].rotationDegrees).toBe(0)
+  })
+
+  // --- Session persistence ---
+
+  it('offers to restore a stored session and dismiss keeps the data', async () => {
+    const session = makeSession()
+    await saveSession(session)
+
+    useImageQueueMock.mockReturnValue({
+      items: [],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+      restoreItems: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+
+    const banner = await screen.findByText(/Pick up where you left off\?/)
+    expect(banner).toBeInTheDocument()
+    expect(screen.getByText(/1 image · saved/)).toBeInTheDocument()
+
+    await userEvent.click(screen.getByRole('button', { name: /Dismiss/ }))
+
+    expect(screen.queryByText(/Pick up where you left off\?/)).not.toBeInTheDocument()
+    expect(await loadSession()).toEqual(session)
+  })
+
+  it('restore hydrates the queue, per-image edits and UI state', async () => {
+    const session = makeSession()
+    await saveSession(session)
+    await saveImage('1', createItem('1', 'one.jpg').file)
+
+    // Stateful fake that mirrors the real useImageQueue.restoreItems.
+    useImageQueueMock.mockImplementation(() => {
+      const [items, setItems] = useState<ImageQueueItem[]>([])
+      return {
+        items,
+        message: null,
+        addFiles: vi.fn(),
+        removeItem: vi.fn(),
+        setItemStatus: vi.fn(),
+        restoreItems: async (records: PersistedQueueItem[]) => {
+          const restored = records.map((record) => createItem(record.id, record.filename))
+          setItems(restored)
+          return restored
+        },
+      }
+    })
+
+    render(<BorderToolPage />)
+
+    await screen.findByText(/Pick up where you left off\?/)
+    await userEvent.click(screen.getByRole('button', { name: 'Restore' }))
+
+    expect(screen.queryByText(/Pick up where you left off\?/)).not.toBeInTheDocument()
+
+    // UI state restored: inspect mode with the single restored image, and the
+    // hydrated per-image recipe (ember filter) drives the inspect preview.
+    await waitFor(() => {
+      expect(screen.getByTestId('inspect-filter')).toHaveTextContent('ember')
+    })
+
+    const footer = screen.getByLabelText('Workspace footer')
+    expect(within(footer).getByText('1 / 1')).toBeInTheDocument()
+    expect(within(footer).getByRole('radio', { name: 'Inspect' })).toHaveAttribute(
+      'aria-checked',
+      'true',
+    )
+  })
+
+  it('clear saved wipes the stored session', async () => {
+    await saveSession(makeSession())
+
+    useImageQueueMock.mockReturnValue({
+      items: [],
+      message: null,
+      addFiles: vi.fn(),
+      removeItem: vi.fn(),
+      setItemStatus: vi.fn(),
+      restoreItems: vi.fn(),
+    })
+
+    render(<BorderToolPage />)
+
+    await screen.findByText(/Pick up where you left off\?/)
+    await userEvent.click(screen.getByRole('button', { name: 'Clear saved' }))
+
+    expect(screen.queryByText(/Pick up where you left off\?/)).not.toBeInTheDocument()
+    expect(await loadSession()).toBeNull()
   })
 })

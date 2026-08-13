@@ -35,7 +35,17 @@ import { useUndoRedoShortcuts } from '@/features/borders/useUndoRedoShortcuts'
 import type { CardMenuAction } from '@/shared/components/ImageCard'
 import { Dropzone } from '@/shared/components/Dropzone'
 import { ExportControls } from '@/shared/components/ExportControls'
+import { RestoreSessionBanner } from '@/shared/components/RestoreSessionBanner'
 import { useImageQueue } from '@/shared/hooks/useImageQueue'
+import {
+  deleteImage,
+  fileFromRecord,
+  getImage,
+  saveImage,
+} from '@/shared/storage/fileStore'
+import { formatBytes } from '@/shared/storage/quota'
+import type { PersistedSession, PersistedUiState } from '@/shared/storage/types'
+import { useSessionPersistence } from '@/shared/storage/useSessionPersistence'
 import type { ImageQueueItem } from '@/shared/types'
 import { canvasToBlob, downloadBlob } from '@/shared/utils/downloadBlob'
 import { exportZip } from '@/shared/utils/exportZip'
@@ -63,7 +73,9 @@ export function BorderToolPage() {
 
   // Per-image edit state (in-memory)
   const {
+    recipesById,
     initializeImages,
+    hydrate,
     removeImages: removeImageRecipes,
     patchImage,
     patchImageLive,
@@ -76,8 +88,10 @@ export function BorderToolPage() {
     getTimeline,
   } = useImageEdits(defaultRecipe)
 
-  const { items, message, addFiles, removeItem, setItemStatus } =
-    useImageQueue()
+  const { items, message, addFiles, removeItem, setItemStatus, restoreItems } =
+    useImageQueue({
+      persistImage: ({ id, file }) => saveImage(id, file),
+    })
 
   const [workspaceMode, setWorkspaceMode] = useState<'browse' | 'inspect'>('browse')
   const [activeItemId, setActiveItemId] = useState<string | null>(null)
@@ -89,6 +103,71 @@ export function BorderToolPage() {
   const [progressMessage, setProgressMessage] = useState<string | null>(null)
   const [progress, setProgress] = useState<{ current: number; total: number } | null>(null)
   const [isCompareActive, setIsCompareActive] = useState(false)
+
+  // Latest UI session state, kept fresh for session persistence.
+  const uiStateRef = useRef<PersistedUiState>({
+    workspaceMode: 'browse',
+    activeItemId: null,
+    selectedIds: [],
+    inspectZoom: { mode: 'fit' },
+    columns: 3,
+  })
+
+  useEffect(() => {
+    uiStateRef.current = {
+      workspaceMode,
+      activeItemId,
+      selectedIds: [...selectedIds],
+      inspectZoom,
+      columns,
+    }
+  }, [workspaceMode, activeItemId, selectedIds, inspectZoom, columns])
+
+  // --- Session persistence ---
+  const handleRestore = useCallback(
+    async (session: PersistedSession) => {
+      const loadFile = async (id: string) => {
+        const record = await getImage(id)
+        return record ? fileFromRecord(record) : null
+      }
+
+      await restoreItems(session.items, loadFile)
+      hydrate(session.edits)
+
+      setWorkspaceMode(session.ui.workspaceMode)
+      setActiveItemId(session.ui.activeItemId)
+      setSelectedIds(new Set(session.ui.selectedIds))
+      setInspectZoom(session.ui.inspectZoom)
+      setColumns(session.ui.columns)
+      setMobilePanel('none')
+    },
+    [hydrate, restoreItems],
+  )
+
+  const {
+    status: persistenceStatus,
+    storageUsage,
+    acceptRestore,
+    dismiss,
+    startFresh,
+    clearLibrary,
+  } = useSessionPersistence({
+    items,
+    recipesById,
+    uiStateRef,
+    onRestore: handleRestore,
+  })
+
+  /** Adding files while a restore offer is pending starts a fresh session. */
+  const handleAddFiles = useCallback(
+    async (files: File[]) => {
+      if (persistenceStatus.status === 'offer-restore') {
+        await startFresh()
+      }
+      await addFiles(files)
+    },
+    [persistenceStatus.status, startFresh, addFiles],
+  )
 
   const readyItems = useMemo(
     () => items.filter((item) => item.status === 'ready'),
@@ -608,6 +687,7 @@ export function BorderToolPage() {
 
   const handleRemoveItem = (id: string) => {
     removeItem(id)
+    void deleteImage(id)
     setSelectedIds((prev) => {
       if (!prev.has(id)) {
         return prev
@@ -811,7 +891,7 @@ export function BorderToolPage() {
         <Dropzone
           variant="compact"
           onFilesAccepted={async (files) => {
-            await addFiles(files)
+            await handleAddFiles(files)
             setMobilePanel('none')
           }}
         />
@@ -901,6 +981,23 @@ export function BorderToolPage() {
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background p-4">
+          {persistenceStatus.status === 'offer-restore' ? (
+            <div className="-m-4 mb-3">
+              <RestoreSessionBanner
+                imageCount={persistenceStatus.session.items.length}
+                savedAt={persistenceStatus.session.savedAt}
+                storageLabel={
+                  storageUsage
+                    ? `${formatBytes(storageUsage.usage)} of ${formatBytes(storageUsage.quota)}`
+                    : undefined
+                }
+                onRestore={() => void acceptRestore()}
+                onClear={() => void clearLibrary()}
+                onDismiss={dismiss}
+              />
+            </div>
+          ) : null}
+
           <div className="mb-3 flex items-center gap-2 md:hidden">
             <button
               type="button"
@@ -929,7 +1026,7 @@ export function BorderToolPage() {
               <Dropzone
                 variant="full"
                 onFilesAccepted={async (files) => {
-                  await addFiles(files)
+                  await handleAddFiles(files)
                 }}
               />
             </div>
